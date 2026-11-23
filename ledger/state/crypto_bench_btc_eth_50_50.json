@@ -1,0 +1,12 @@
+{
+ "arm": "crypto_bench_btc_eth_50_50",
+ "start": "2026-11-24",
+ "last_date": null,
+ "pending": null,
+ "portfolio": {
+  "cash": 5000.0,
+  "units": {},
+  "peak_equity": 5000.0
+ },
+ "equity": []
+}
