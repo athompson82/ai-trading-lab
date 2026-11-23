@@ -21,6 +21,7 @@ objectives need the project owner's approval.
 | D-013 | 2026-11-23 | The live runner shares the backtest's daily step function; a test asserts that replaying live over history equals the backtest exactly. | Removes the most common class of "backtest vs live" bugs. | Claude (routine) |
 | D-014 | 2026-11-23 | Q3a amended before the plan was tagged: "best 1% of days < 50% of profit" becomes "no more reliant on the best 1% of days than the primary passive benchmark (SPY / BTC)". | The original rule failed for every portfolio in development data, including buy-and-hold SPY (128%) and BTC (288%), so it couldn't discriminate. Changed before anyone saw holdout data, so no bias. | Approved by owner |
 | D-015 | 2026-11-23 | Pre-registration signed off and frozen as tag `prereg-v1`. | Owner approval. | Owner |
+| D-016 | 2026-11-23 | Public dashboard on GitHub Pages, rebuilt nightly from the ledger only (read-only; imports no trading code). | Owner asked for visibility; free; no new services. Contains simulated trades only. | Approved by owner |
 
 ## Observations worth remembering
 

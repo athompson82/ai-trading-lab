@@ -39,6 +39,11 @@ python -m lab.cli verify             # ledger integrity
 python -m lab.cli report
 ```
 
+## Dashboard
+
+Published nightly to GitHub Pages: https://athompson82.github.io/ai-trading-lab/
+(built by `lab/dashboard.py` from the ledger only).
+
 ## Automation
 
 `.github/workflows/daily.yml` runs at 01:17 UTC every day. It needs the

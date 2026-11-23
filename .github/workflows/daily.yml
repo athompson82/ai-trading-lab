@@ -10,6 +10,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: paper-trading
@@ -45,3 +47,31 @@ jobs:
           git add ledger reports data
           git diff --cached --quiet || git commit -m "Daily run $(date -u +%Y-%m-%d)"
           for i in 1 2 3 4; do git push && break; sleep $((i*10)); git pull --rebase; done
+
+  dashboard:
+    # Rebuild the public dashboard from the ledger after every run, even a failed one,
+    # so failures are visible there too.
+    needs: run
+    if: ${{ always() && vars.FORWARD_START != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main   # includes the ledger commit the run job just pushed
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Build dashboard
+        env:
+          FORWARD_START: ${{ vars.FORWARD_START }}
+        run: python -m lab.dashboard
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
