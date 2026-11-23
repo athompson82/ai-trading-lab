@@ -19,6 +19,8 @@ objectives need the project owner's approval.
 | D-011 | 2026-11-23 | Idle ETF-sleeve cash earns the T-bill ETF (BIL) return; idle crypto cash earns 0. | Benchmarks are fully invested. Ignoring cash yield would unfairly penalise a strategy that is often in cash. Crypto exchange USD balances typically earn nothing. | Claude (routine) |
 | D-012 | 2026-11-23 | Holdout period = 2023-11-23 onward (3 years), evaluated once, only after the pre-registration is tagged `prereg-v1`. | Enforced in code (lab/holdout.py); repeat runs are refused or permanently logged. | Claude (routine) |
 | D-013 | 2026-11-23 | The live runner shares the backtest's daily step function; a test asserts that replaying live over history equals the backtest exactly. | Removes the most common class of "backtest vs live" bugs. | Claude (routine) |
+| D-014 | 2026-11-23 | Q3a amended before the plan was tagged: "best 1% of days < 50% of profit" becomes "no more reliant on the best 1% of days than the primary passive benchmark (SPY / BTC)". | The original rule failed for every portfolio in development data, including buy-and-hold SPY (128%) and BTC (288%), so it couldn't discriminate. Changed before anyone saw holdout data, so no bias. | Approved by owner |
+| D-015 | 2026-11-23 | Pre-registration signed off and frozen as tag `prereg-v1`. | Owner approval. | Owner |
 
 ## Observations worth remembering
 

@@ -84,10 +84,11 @@ def bootstrap_sharpe_ci(r: pd.Series, ppy: int, bench: pd.Series | None = None,
     a = r.values
     b = bench.reindex(r.index).fillna(0.0).values if bench is not None else None
     n = len(a)
-    s_list, d_list = [], []
+    s_list, d_list, g_list = [], [], []
     for _ in range(n_boot):
         ix = stationary_bootstrap_idx(n, mean_block, rng)
         sa = a[ix]
+        g_list.append(float(np.prod(1 + sa) ** (ppy / n) - 1))
         s = sa.mean() / sa.std(ddof=1) * math.sqrt(ppy) if sa.std() > 0 else 0.0
         s_list.append(s)
         if b is not None:
@@ -95,7 +96,8 @@ def bootstrap_sharpe_ci(r: pd.Series, ppy: int, bench: pd.Series | None = None,
             sbv = sb.mean() / sb.std(ddof=1) * math.sqrt(ppy) if sb.std() > 0 else 0.0
             d_list.append(s - sbv)
     lo, hi = alpha / 2 * 100, (1 - alpha / 2) * 100
-    out = {"sharpe_ci": (float(np.percentile(s_list, lo)), float(np.percentile(s_list, hi)))}
+    out = {"sharpe_ci": (float(np.percentile(s_list, lo)), float(np.percentile(s_list, hi))),
+           "cagr_ci": (float(np.percentile(g_list, lo)), float(np.percentile(g_list, hi)))}
     if b is not None:
         d = np.array(d_list)
         out["sharpe_diff_ci"] = (float(np.percentile(d, lo)), float(np.percentile(d, hi)))
@@ -109,13 +111,22 @@ def concentration(r: pd.Series, equity: pd.Series) -> dict:
     total = pnl.sum()
     top = pnl.sort_values(ascending=False)
     k = max(1, int(len(pnl) * 0.01))
-    yearly = equity.resample("YE").last().pct_change()
-    yearly.iloc[0] = equity.resample("YE").last().iloc[0] / equity.iloc[0] - 1
+    # Consecutive 12-month blocks from the start (a final block shorter than
+    # 6 months is ignored), so a 3-year holdout gives exactly 3 "years".
+    blocks, t0 = [], equity.index[0]
+    while t0 < equity.index[-1]:
+        t1 = t0 + pd.DateOffset(years=1)
+        seg = equity[(equity.index >= t0) & (equity.index <= t1)]
+        if len(seg) > 1 and (seg.index[-1] - t0).days >= 182:
+            blocks.append(float(seg.iloc[-1] / seg.iloc[0] - 1))
+        t0 = t1
     return {
+        "yearly_block_returns": blocks,
         "best_1pct_days_share_of_pnl": float(top.iloc[:k].sum() / total) if total else float("nan"),
         "pnl_without_best_10_days": float(total - top.iloc[:10].sum()),
         "hit_rate_days": float((r[r != 0] > 0).mean()),
-        "positive_years": f"{int((yearly > 0).sum())}/{len(yearly)}",
+        "positive_years": int(sum(b > 0 for b in blocks)),
+        "n_years": len(blocks),
     }
 
 

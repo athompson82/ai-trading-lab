@@ -1,6 +1,6 @@
 # Pre-registration: AI Trading Lab forward experiment
 
-**Status: DRAFT, awaiting owner sign-off.** When signed off, this file and the
+**Status: SIGNED OFF by the project owner on 2026-11-23.** When signed off, this file and the
 code are frozen with git tag `prereg-v1`. After that, any change to strategy,
 risk, cost model, metrics or criteria is recorded in docs/DECISIONS.md and
 starts a new version with its own evaluation clock. Results under the old
@@ -51,7 +51,7 @@ interval. Forward net return is reported but is not decisive on its own.
 If only (c) holds, the finding is "lower risk, no proven risk-adjusted edge."
 
 **Q3. Consistent rather than lucky?** Met if, in the holdout:
-- the best 1% of days account for less than 50% of total profit,
+- the strategy relies on its best 1% of days no more than its primary passive benchmark does (SPY for ETFs, BTC for crypto), measured as those days' share of total profit (amended before tagging, D-014),
 - profit remains positive after removing the best 10 days, and
 - at least 2 of the 3 holdout years are positive.
 
@@ -89,4 +89,5 @@ the expected honest result is "insufficient evidence" unless the effect is large
 
 ## 6. Sign-off
 
-Owner: ____________________  Date: __________
+Approved by the project owner (Adam), in the project working session, 2026-11-23.
+Frozen as git tag `prereg-v1`.
