@@ -30,14 +30,14 @@ risk-adjusted return. No sign of a large edge, and none expected.
 
 ## Next
 
-1. Move the code into the dedicated GitHub repository (waiting on owner).
+1. ~~Move the code into the dedicated GitHub repository.~~ Done 2026-11-23 (public repo, `main`).
 2. Owner sign-off of docs/PREREGISTRATION.md, then tag `prereg-v1`.
 3. Run the one-time holdout evaluation.
 4. AI overlay implementation (needs an Anthropic API key).
-5. Repository secrets `TIINGO_API_KEY` (and later `ANTHROPIC_API_KEY`); set `FORWARD_START` to begin the shakedown.
+5. ~~Repository secret `TIINGO_API_KEY`.~~ Added by owner 2026-11-23; checked with the `data-check` workflow.
+   Later: `ANTHROPIC_API_KEY`; set the `FORWARD_START` variable to begin the shakedown.
 
 ## Blocked on owner
 
-- Create a private GitHub repo `ai-trading-lab` and add it to the session.
 - Sign off the pre-registration.
 - Anthropic API key (for the AI arm). Spend cap about $30/month, as approved.
