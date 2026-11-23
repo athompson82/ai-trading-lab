@@ -1,0 +1,25 @@
+name: data-check
+
+# Manual check that data sources and the TIINGO_API_KEY secret work.
+# Downloads and validates all data; trades nothing, commits nothing.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Fetch and validate all market data
+        env:
+          TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}
+        run: |
+          test -n "$TIINGO_API_KEY" || { echo "TIINGO_API_KEY secret is missing"; exit 1; }
+          python -m lab.cli fetch
+          python -m lab.cli verify
