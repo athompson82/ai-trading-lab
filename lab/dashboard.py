@@ -263,6 +263,7 @@ h3{font-size:15px;margin:0 0 10px}.muted{color:var(--muted)}.small{font-size:13p
 .scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}
 th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);white-space:nowrap}th{color:var(--text2);font-weight:600}
 .num{text-align:right;font-variant-numeric:tabular-nums}
+.card{overflow-x:auto}.card td:first-child,.card th:first-child{white-space:normal;min-width:120px}
 .badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600}
 .ok{color:var(--good);background:var(--goodbg)}.no{color:var(--bad);background:var(--badbg)}
 ul.verdicts{list-style:none;padding:0;margin:0}ul.verdicts li{padding:5px 0;border-bottom:1px solid var(--border)}
@@ -284,6 +285,28 @@ details summary{cursor:pointer;color:var(--text2)}footer{margin-top:40px;font-si
  <div class="card tile"><div class=k>Ledger tamper check</div><div class=v><span class="badge {{CHAIN_CLASS}}">{{CHAIN}}</span></div></div>
  <div class="card tile"><div class=k>Forward test start</div><div class=v>{{START}}</div><div class="muted small">US$5,000 per portfolio</div></div>
 </div>
+
+<details class=card style="margin-top:16px"><summary><strong>New to this? How to read this page</strong></summary>
+<div class=small style="margin-top:10px">
+<p><strong>What's being tested.</strong> Ten pretend portfolios, each starting with US$5,000, run by different methods on the same markets. Nothing here uses real money.</p>
+<ul>
+<li><strong>Trend strategy:</strong> fixed rules. Hold assets whose prices have been rising over the past 1–12 months, sized so the portfolio's swings stay moderate. Checked weekly.</li>
+<li><strong>Trend + AI overlay:</strong> the same, but once a week an AI reads the news and may <em>reduce</em> positions if it sees a specific danger.</li>
+<li><strong>AI trader:</strong> every day an AI reads current news and price trends and decides what to hold, within the same limits.</li>
+<li><strong>Benchmarks:</strong> what a passive investor would get by simply buying and holding (S&amp;P 500, a 60/40 stocks/bonds mix, Bitcoin, BTC/ETH). Any strategy has to beat these to be worth the effort.</li>
+</ul>
+<p><strong>Key terms</strong></p>
+<ul>
+<li><strong>Return:</strong> gain or loss since the start. +10% means $5,000 became $5,500.</li>
+<li><strong>Worst drop (drawdown):</strong> the biggest fall from a high point. A 20% drawdown means at some point the portfolio was 20% below its best value. Smaller is better; big drops are hard to recover from (a 50% loss needs a 100% gain to get back).</li>
+<li><strong>Volatility:</strong> how much the value swings day to day. Higher means a bumpier ride.</li>
+<li><strong>Sharpe ratio:</strong> return per unit of risk. Around 0.5 is typical for stocks over the long run; 1 is very good; anything above 2 over a short period is almost certainly luck.</li>
+<li><strong>Costs:</strong> trading fees and price slippage we deliberately charge on every trade, set pessimistically.</li>
+<li><strong>Shakedown / scored window:</strong> the first weeks only check that everything works. Results count from 14 December for 90 days.</li>
+</ul>
+<p><strong>How to judge it.</strong> Over weeks, results are mostly luck, so look at three things: does it run reliably, are the drops smaller than the benchmarks', and does it sit near the top of the "Better than luck?" ranking (95%+)? A good outcome isn't spectacular profit. It's similar or better returns than buying and holding, with smaller crashes, after costs.</p>
+<p><strong>Example.</strong> If Bitcoin falls 20% and the crypto trend strategy only falls 8%, that's the strategy doing its job: it was partly in cash because the trend had turned down.</p>
+</div></details>
 
 <h2>Portfolio value</h2>
 <p class="muted small">Each portfolio started with US$5,000 (dotted line). The "Trend + AI overlay" portfolios behave identically to the plain trend portfolios until the AI overlay is switched on; that period is excluded from the AI comparison.</p>

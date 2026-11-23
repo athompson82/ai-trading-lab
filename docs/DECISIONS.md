@@ -31,6 +31,9 @@ objectives need the project owner's approval.
 | D-023 | 2026-11-23 | Report-only cost sensitivity (crypto 0.45/0.30/0.10%, ETF 0.03% per side) and managed-futures ETF benchmark (DBMF, KMLM). | Costs are the largest controllable profit lever (≈3.7%/yr drag on the crypto holdout); the managed-futures ETFs answer "should we just buy the professional version?". Report-only, so it can't bias the test. | Approved by owner |
 | D-024 | 2026-11-23 | Weekly report every Monday (GitHub issue + `reports/weekly/`), with AI analyst review and candidate improvements. Daily view stays on the dashboard. | Owner wants regular verification of what works. Weekly, because daily figures are mostly noise. | Approved by owner |
 | D-025 | 2026-11-23 | "Self-improvement" works by proposal, not self-modification: candidates are logged, reviewed at the day-60 interim, and launched as pre-registered version-2 portfolios alongside version 1. | A system that changes its own rules mid-test makes its results unverifiable; parallel versions give proof. | Approved by owner |
+| D-026 | 2026-11-23 | Hourly alert watcher (BTC/ETH ±10% in 24h, SPY −4% on the day, nightly run >30h overdue) posting GitHub issues. Alerts only, never trades. | Owner wants to be informed in near real time; trading faster wouldn't help these slow strategies and would break the frozen rules. | Approved by owner |
+| D-027 | 2026-11-23 | Plain-English section in the weekly report and a "How to read this page" guide on the dashboard. | Owner is new to trading. | Approved by owner |
+| D-028 | 2026-11-23 | Weekly check-in by Claude (Mondays 04:07 UTC, after the weekly report). Claude fixes operational/reporting issues on its own and logs them; anything changing how a portfolio trades, budget, risk or scope goes to the owner as a recommendation. | Owner asked Claude to monitor and suggest adjustments; the split keeps the test verifiable. | Approved by owner |
 
 ## Observations worth remembering
 

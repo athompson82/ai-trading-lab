@@ -65,6 +65,8 @@ to answer Q4 and the AI A/B question.
 
 - Daily: dashboard (https://athompson82.github.io/ai-trading-lab/), rebuilt after every nightly run.
 - Weekly (Mondays): `reports/weekly/`, also posted as a GitHub issue; candidate improvements are collected in `docs/IMPROVEMENTS.md`.
+- Hourly: alert watcher (big price moves, overdue nightly run) posts GitHub issues; alerts only.
+- Weekly (Mondays ~04:07 UTC): Claude's check-in: health review, fixes, plain-English summary and recommendations.
 - Day 60 (2027-02-12): interim report, plus selection of version-2 candidates with the owner.
 
 ## Blocked on owner

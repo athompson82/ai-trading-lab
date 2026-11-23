@@ -127,6 +127,8 @@ def build(use_ai: bool = True, client=None) -> tuple[str, Path]:
         _log_candidates(today, review["candidate_improvements"])
     L += ["", "---", "Dashboard: https://athompson82.github.io/ai-trading-lab/ · "
           "Plan: docs/PREREGISTRATION.md · Candidate improvements: docs/IMPROVEMENTS.md"]
+    if review is not None:  # plain-English box goes near the top, after the phase line
+        L[4:4] = ["## In plain English", "", review["plain_english"], ""]
     text = "\n".join(L) + "\n"
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     path = OUT_DIR / f"{today:%Y-%m-%d}.md"
@@ -137,6 +139,7 @@ def build(use_ai: bool = True, client=None) -> tuple[str, Path]:
 REVIEW_SCHEMA = {
     "type": "object",
     "properties": {
+        "plain_english": {"type": "string"},
         "summary": {"type": "string"},
         "strengths": {"type": "array", "items": {"type": "string"}},
         "weaknesses": {"type": "array", "items": {"type": "string"}},
@@ -147,7 +150,7 @@ REVIEW_SCHEMA = {
             "required": ["idea", "evidence", "how_to_test"], "additionalProperties": False}},
         "caveats": {"type": "string"},
     },
-    "required": ["summary", "strengths", "weaknesses", "candidate_improvements", "caveats"],
+    "required": ["plain_english", "summary", "strengths", "weaknesses", "candidate_improvements", "caveats"],
     "additionalProperties": False,
 }
 
@@ -160,7 +163,10 @@ def _ai_review(facts: str, client=None) -> dict | None:
               "separate 'version 2' portfolios with rules fixed in advance), must not use leverage, and must "
               "say what evidence would show they work. Prefer ideas that cut costs or risk over ideas that "
               "chase returns. Write in plain English.")
-    prompt = ("Weekly figures:\n\n" + facts + "\n\nWrite: a 3-5 sentence summary; 2-4 strengths; 2-4 "
+    prompt = ("Weekly figures:\n\n" + facts + "\n\nWrite: 'plain_english': 4-6 short sentences for an owner "
+              "with no trading background, explaining what happened this week and why, defining any term you use "
+              "(e.g. 'drawdown means the drop from the highest value'), and saying whether anything needs their "
+              "attention; a 3-5 sentence summary; 2-4 strengths; 2-4 "
               "weaknesses; 0-3 candidate improvements (only where the figures give a reason); and caveats.")
     try:
         res = ai.decide(system, prompt, REVIEW_SCHEMA, Ledger(LEDGER), purpose="weekly_review",

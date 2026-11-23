@@ -1,0 +1,30 @@
+name: hourly-alerts
+
+# Early-warning watcher: big price moves or an overdue nightly run open a
+# GitHub issue (emailed to the owner). Alerts only; never trades, commits nothing.
+on:
+  schedule:
+    - cron: "11 * * * *"   # hourly
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    if: ${{ vars.FORWARD_START != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Check prices and run health
+        env:
+          TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: python -m lab.alerts

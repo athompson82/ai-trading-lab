@@ -119,9 +119,10 @@ def test_weekly_report_builds_and_logs_candidates(tmp_path, monkeypatch):
     monkeypatch.setattr(weekly, "OUT_DIR", tmp_path / "weekly")
     monkeypatch.setattr(weekly, "IMPROVEMENTS", tmp_path / "IMPROVEMENTS.md")
     monkeypatch.setenv("FORWARD_START", "2026-10-01")
-    review = {"summary": "s", "strengths": ["a"], "weaknesses": ["b"], "caveats": "c",
+    review = {"plain_english": "pe", "summary": "s", "strengths": ["a"], "weaknesses": ["b"], "caveats": "c",
               "candidate_improvements": [{"idea": "cheaper crypto execution", "evidence": "e", "how_to_test": "t"}]}
     text, path = weekly.build(use_ai=True, client=FakeClient(review))
     assert path.exists() and "Better than luck?" in text and "cheaper crypto execution" in text
+    assert "## In plain English" in text
     assert "| proposed |" in (tmp_path / "IMPROVEMENTS.md").read_text()
     assert Ledger(tmp_path / "events.jsonl").verify()[0]
