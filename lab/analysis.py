@@ -20,10 +20,20 @@ import numpy as np
 import pandas as pd
 
 from . import data
-from .config import SLEEVES, SleeveConfig
+from .config import CostModel, SLEEVES, SleeveConfig
 from .engine import Portfolio, apply_risk, is_rebalance_day, step
 
 N_RANDOM = 1000
+# Report-only extra data (not part of the frozen config): managed-futures ETFs,
+# i.e. professionally run, diversified trend following you can simply buy.
+REPORT_ONLY_ETFS = ("DBMF", "KMLM")
+
+# Cost scenarios for re-pricing the SAME decisions (per side, all-in).
+COST_SCENARIOS = {
+    "etf_trend": {"modelled (0.08%)": 0.0008, "low-cost broker (0.03%)": 0.0003},
+    "crypto_trend": {"modelled: Coinbase taker (0.75%)": 0.0075, "Coinbase limit order (~0.45%)": 0.0045,
+                     "Kraken maker (~0.30%)": 0.0030, "spot crypto ETF (~0.10%)": 0.0010},
+}
 SEED = 20261123  # fixed so the baseline is reproducible
 
 
@@ -106,6 +116,64 @@ def percentile_rank(baseline: pd.DataFrame, value: float, col: str = "return") -
     return float((baseline[col] < value).mean() * 100)
 
 
+# --------------------------------------------------------------------------- 3. cost sensitivity
+def _cfg_with_cost(cfg: SleeveConfig, per_side: float) -> SleeveConfig:
+    return replace(cfg, costs=CostModel(fee=per_side, half_spread=0.0, slippage=0.0,
+                                        min_trade_usd=cfg.costs.min_trade_usd))
+
+
+def replay(events: list[dict], arm: str, per_side: float | None = None, start: str | None = None):
+    """Re-run an arm's logged decisions (post-risk targets, same timing) under another cost level.
+    With per_side=None it uses the modelled costs and should reproduce the live equity (sanity check)."""
+    sleeve = "etf_trend" if arm.startswith("etf") else "crypto_trend"
+    cfg = SLEEVES[sleeve]
+    if arm.split("_", 1)[1].startswith("bench"):
+        return None  # benchmarks barely trade; not informative
+    decs = [e["data"] for e in events if e["type"] == "decision" and e["data"]["arm"] == arm]
+    if not decs:
+        return None
+    timing = {e["data"]["date"]: e["data"]["executes_from"] for e in events
+              if e["type"] == "decision_timing" and e["data"]["arm"] == arm}
+    if per_side is not None:
+        cfg = _cfg_with_cost(cfg, per_side)
+    opens, closes, marks, cash = _prices(cfg, start or decs[0]["date"])
+    decisions = {pd.Timestamp(x["date"]): ({k: (np.nan if v is None else v) for k, v in x["target"].items()},
+                                           pd.Timestamp(timing[x["date"]]) if x["date"] in timing else None)
+                 for x in decs}
+    return _simulate(cfg, opens, closes, marks, cash, decisions)
+
+
+def cost_sensitivity(events: list[dict]) -> dict:
+    out = {}
+    arms = sorted({e["data"]["arm"] for e in events if e["type"] == "decision"})
+    for arm in arms:
+        sleeve = "etf_trend" if arm.startswith("etf") else "crypto_trend"
+        rows = {}
+        for label, c in COST_SCENARIOS[sleeve].items():
+            eq = replay(events, arm, c)
+            if eq is None or len(eq) < 2:
+                break
+            rows[label] = float(eq.iloc[-1] / eq.iloc[0] - 1)
+        if rows:
+            out[arm] = rows
+    return out
+
+
+# --------------------------------------------------------------------------- 4. buy-the-pros benchmark
+def managed_futures(start: str) -> dict:
+    """Buy-and-hold return of each managed-futures ETF since `start`, after one ETF-cost purchase."""
+    out = {}
+    for sym in REPORT_ONLY_ETFS:
+        try:
+            px = data.load(sym)["close"]
+        except data.DataError:
+            continue
+        px = px[px.index >= pd.Timestamp(start)]
+        if len(px) > 1:
+            out[sym] = float(px.iloc[-1] / px.iloc[0] * (1 - SLEEVES["etf_trend"].costs.per_side) - 1)
+    return out
+
+
 def build(ledger_path: Path, state_dir: Path, start: str | None) -> dict:
     """Everything the dashboard/report needs, as plain JSON-able data."""
     events = [json.loads(l) for l in ledger_path.read_text().splitlines() if l.strip()] if ledger_path.exists() else []
@@ -114,6 +182,7 @@ def build(ledger_path: Path, state_dir: Path, start: str | None) -> dict:
         s = pure_ai_shadow(events, arm)
         if s is not None and len(s) > 1:
             out["shadow"][arm] = [[str(d.date()), float(v)] for d, v in s.items()]
+    out["costs"] = cost_sensitivity(events)
     if not start:
         return out
     for sleeve in SLEEVES:
@@ -134,6 +203,9 @@ def build(ledger_path: Path, state_dir: Path, start: str | None) -> dict:
         if shadow:
             ret = shadow[-1][1] / shadow[0][1] - 1
             ranks[f"{prefix}_ai_trader_pure"] = {"return": ret, "beats_pct_of_random": percentile_rank(base, ret)}
+        if sleeve == "etf_trend":
+            for sym, ret in managed_futures(start).items():
+                ranks[f"mf_{sym}"] = {"return": ret, "beats_pct_of_random": percentile_rank(base, ret)}
         out["random"][sleeve] = {
             "n": len(base), "start": start,
             "pct": {str(p): float(np.percentile(base["return"], p)) for p in (5, 25, 50, 75, 95)},

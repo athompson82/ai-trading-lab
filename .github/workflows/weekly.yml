@@ -1,0 +1,51 @@
+name: weekly-report
+
+# Every Monday after the nightly run: build the weekly report (numbers + AI
+# analyst review + candidate improvements), commit it, and post it as a GitHub
+# issue so the repository owner gets it by email.
+on:
+  schedule:
+    - cron: "43 3 * * 1"   # Mondays 03:43 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: paper-trading
+  cancel-in-progress: false
+
+jobs:
+  report:
+    if: ${{ vars.FORWARD_START != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Build weekly report
+        id: build
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          FORWARD_START: ${{ vars.FORWARD_START }}
+        run: echo "path=$(python -m lab.weekly)" >> "$GITHUB_OUTPUT"
+      - name: Commit report, candidate list and ledger
+        run: |
+          git config user.name "paper-trading-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add reports ledger docs/IMPROVEMENTS.md 2>/dev/null || git add reports ledger
+          git diff --cached --quiet || git commit -m "Weekly report $(date -u +%Y-%m-%d)"
+          for i in 1 2 3 4; do git push && break; sleep $((i*10)); git pull --rebase; done
+      - name: Post as GitHub issue (emails the owner)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --title "Weekly report: week ending $(date -u +%Y-%m-%d)" \
+            --body-file "${{ steps.build.outputs.path }}"

@@ -57,7 +57,8 @@ def _all_blocks(messages, response):
     yield from response.content
 
 
-def decide(system: str, prompt: str, schema: dict, ledger, purpose: str, client=None) -> AIResult:
+def decide(system: str, prompt: str, schema: dict, ledger, purpose: str, client=None,
+           web_search: bool = True) -> AIResult:
     """Ask Claude for a structured decision, using web search for current news.
 
     Raises AIUnavailable (never returns a made-up answer) when there is no key,
@@ -76,16 +77,18 @@ def decide(system: str, prompt: str, schema: dict, ledger, purpose: str, client=
     cost, usage_log, response = 0.0, [], None
     try:
         for _ in range(4):  # resume server-tool pauses a few times at most
-            response = client.beta.messages.create(
+            kwargs = dict(
                 model=MODEL,
                 max_tokens=16000,
                 system=system,
                 messages=messages,
-                tools=[{"type": "web_search_20260209", "name": "web_search", "max_uses": MAX_SEARCHES}],
                 output_config={"effort": EFFORT, "format": {"type": "json_schema", "schema": schema}},
                 betas=["server-side-fallback-2026-07-01"],
                 fallbacks="default",
             )
+            if web_search:
+                kwargs["tools"] = [{"type": "web_search_20260209", "name": "web_search", "max_uses": MAX_SEARCHES}]
+            response = client.beta.messages.create(**kwargs)
             c = _estimate_cost(response.usage)
             cost += c
             usage_log.append({"in": response.usage.input_tokens, "out": response.usage.output_tokens,

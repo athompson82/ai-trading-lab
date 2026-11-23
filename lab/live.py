@@ -99,7 +99,8 @@ def refresh_all() -> list[str]:
     for s in SLEEVES.values():
         for a in s.assets:
             syms[a] = CRYPTO_DATA_START if a.endswith("-USD") else ETF_DATA_START
-    for a in BENCHMARK_ETFS:
+    from .analysis import REPORT_ONLY_ETFS
+    for a in BENCHMARK_ETFS + REPORT_ONLY_ETFS:
         syms[a] = ETF_DATA_START
     for sym, start in syms.items():
         try:

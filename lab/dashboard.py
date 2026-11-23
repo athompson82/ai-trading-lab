@@ -33,6 +33,7 @@ LABELS = {
     "etf_bench_60_40": "60/40 stocks/bonds", "crypto_trend": "Trend strategy", "crypto_trend_ai": "Trend + AI overlay",
     "crypto_bench_btc": "Bitcoin", "crypto_bench_btc_eth_50_50": "50/50 BTC/ETH",
     "etf_ai_trader": "AI trader (news + trends)", "crypto_ai_trader": "AI trader (news + trends)",
+    "mf_DBMF": "Managed-futures ETF DBMF (buy & hold)", "mf_KMLM": "Managed-futures ETF KMLM (buy & hold)",
 }
 
 
@@ -197,6 +198,13 @@ def build() -> str:
     if an.get("error"):
         luck_html += f"<p class=muted>Comparison unavailable: {_esc(an['error'])}</p>"
 
+    cost_html = ""
+    for arm, sc in an.get("costs", {}).items():
+        cells = "".join(f"<tr><td>{_esc(k)}</td><td class=num>{v:+.2%}</td></tr>" for k, v in sc.items())
+        cost_html += (f"<div class=card><h3>{_esc(LABELS.get(arm, arm))} <span class=muted>· "
+                      f"{_esc(arm.split('_')[0].upper())}</span></h3><table><thead><tr><th>Trading cost per trade</th>"
+                      f"<th class=num>Return, same decisions</th></tr></thead><tbody>{cells}</tbody></table></div>")
+
     rel_ok = rel["expected"] == 0 or (rel["completed"] / rel["expected"] >= 0.99)
     chart_data = {k: {"title": v["title"], "series": [
         {"id": a, "label": LABELS[a], "points": d["series"].get(a, [])} for a in v["arms"]]
@@ -221,6 +229,7 @@ def build() -> str:
                                     "open after the first decision.</td></tr>",
         "{{DECISIONS}}": dec_rows or "<tr><td colspan=5 class=muted>No decisions yet.</td></tr>",
         "{{LUCK}}": luck_html or "<p class=muted>Appears once the forward test has a few days of data.</p>",
+        "{{COSTS}}": cost_html or "<p class=muted>Appears after the first trades.</p>",
         "{{HOLDOUT}}": ho_html or "<p class=muted>Not yet evaluated.</p>",
         "{{START}}": _esc(d["start"] or "not set"),
         "{{REPO}}": REPO_URL,
@@ -283,6 +292,10 @@ details summary{cursor:pointer;color:var(--text2)}footer{margin-top:40px;font-si
 <h2>Better than luck?</h2>
 <p class="muted small">Each portfolio ranked against 1,000 "random guessers" that pick random weights on the same assets every week, with the same costs and limits. Beating 50% is what luck alone gives on average; a result has to sit near the top (95%+) to suggest skill, and even then 90 days is a short test.</p>
 <div class=grid2>{{LUCK}}</div>
+
+<h2>What would cheaper trading change?</h2>
+<p class="muted small">The same decisions re-priced at lower trading costs (report only; the portfolios themselves always pay the pessimistic modelled cost). The gap between rows is money lost to fees rather than to bad decisions.</p>
+<div class=grid2>{{COSTS}}</div>
 
 <h2>Summary</h2>
 <div class="card scroll"><table><thead><tr><th>Sleeve</th><th>Portfolio</th><th class=num>Value</th><th class=num>Return</th><th class=num>Worst drop</th><th class=num>Trades</th><th class=num>Costs paid</th></tr></thead>

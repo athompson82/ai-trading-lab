@@ -61,6 +61,12 @@ to answer Q4 and the AI A/B question.
 5. ~~Repository secret `TIINGO_API_KEY`.~~ Added by owner 2026-11-23; checked with the `data-check` workflow.
    Later: `ANTHROPIC_API_KEY`; set the `FORWARD_START` variable to begin the shakedown.
 
+## Reporting
+
+- Daily: dashboard (https://athompson82.github.io/ai-trading-lab/), rebuilt after every nightly run.
+- Weekly (Mondays): `reports/weekly/`, also posted as a GitHub issue; candidate improvements are collected in `docs/IMPROVEMENTS.md`.
+- Day 60 (2027-02-12): interim report, plus selection of version-2 candidates with the owner.
+
 ## Blocked on owner
 
 - Set repository variable `FORWARD_START=2026-11-24` to start the shakedown.

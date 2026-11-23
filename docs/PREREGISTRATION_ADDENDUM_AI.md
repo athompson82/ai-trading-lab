@@ -95,3 +95,25 @@ the ledger and price data by `lab/analysis.py`.
    Reading the result:
    - ≥ 95% is a suggestive sign of skill. Over 90 days it is not proof.
    - Around 50% is indistinguishable from luck.
+
+## 7. Further report-only additions and the improvement process (2026-11-23, before the scored window)
+
+3. **Cost sensitivity.** Each active arm's logged decisions are re-priced at
+   lower trading costs, using the same decisions and timing:
+   - Crypto: 0.45%, 0.30% and 0.10% per side.
+   - ETF: 0.03% per side.
+
+   Replaying at the modelled cost reproduces the live results to within $0.001,
+   which validates the replay. The portfolios themselves always pay the
+   modelled, pessimistic cost.
+4. **"Buy the professionals" benchmark.** Buy-and-hold returns of the
+   managed-futures ETFs DBMF and KMLM over the same period are ranked against
+   the random baseline beside the ETF sleeve.
+5. **Weekly review and improvement pipeline.**
+   - Every Monday a report with figures, an AI analyst review, and candidate
+     improvements is committed and posted as a GitHub issue.
+   - Candidates are logged in `docs/IMPROVEMENTS.md` and are **never applied**
+     to running portfolios.
+   - At the day-60 interim the owner chooses which candidates become
+     version-2 portfolios. Their rules and criteria are pre-registered before
+     they start, and they run alongside version 1 on live data.
