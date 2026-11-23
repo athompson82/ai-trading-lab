@@ -91,6 +91,11 @@ def build(use_ai: bool = True, client=None) -> tuple[str, Path]:
         for arm, sc in an["costs"].items():
             L.append(f"- {_label(arm)}: " + "; ".join(f"{k}: {v:+.2%}" for k, v in sc.items()))
         L.append("")
+    cad = an.get("cad")
+    if cad and cad.get("series"):
+        L += ["## Canadian mirror (CAD, report-only)", "",
+              f"- ETF Trend Follower held as Canadian-listed equivalents: {cad['return']:+.2%} in CAD "
+              f"(costs C${cad['costs_cad']:.2f}; US dollar vs CAD over the period {cad['usdcad_change']:+.2%}).", ""]
     L += ["## AI activity", "",
           f"- AI calls this week: {len(ai_calls)} ({sum(1 for c in ai_calls if c.get('ok'))} succeeded); "
           f"API spend this month: ${month_cost:.2f} of the $50 stop.",

@@ -247,7 +247,7 @@ def payload() -> dict:
         "headline": _headline(ports), "systems": SYSTEMS,
         "markets": {k: {"title": v["title"], "arms": v["arms"]} for k, v in MARKETS.items()},
         "portfolios": ports, "shadow": an.get("shadow", {}), "random": an.get("random", {}),
-        "costs": an.get("costs", {}), "feed": _feed(d), "holdout": holdout,
+        "costs": an.get("costs", {}), "feed": _feed(d), "holdout": holdout, "cad": an.get("cad"),
         "health": {"last_run": last_run, "completed": rel["completed"], "expected": rel["expected"],
                    "missed": rel["missed"][-10:], "errors": rel["errors"], "ledger_ok": d["chain_ok"],
                    "ledger_msg": d["chain_msg"], "ai_month": ai_month, "ai_cap": 50},

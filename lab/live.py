@@ -102,6 +102,7 @@ def refresh_all() -> list[str]:
     from .analysis import REPORT_ONLY_ETFS
     for a in BENCHMARK_ETFS + REPORT_ONLY_ETFS:
         syms[a] = ETF_DATA_START
+    syms["FX_USDCAD"] = "2020-01-01"  # report-only Canadian mirror (addendum A2)
     for sym, start in syms.items():
         try:
             data.refresh(sym, start)

@@ -174,6 +174,92 @@ def managed_futures(start: str) -> dict:
     return out
 
 
+# --------------------------------------------------------------------------- 5. Canadian mirror (addendum A2)
+# Unhedged Canadian-listed funds tracking the same index behave like the US fund
+# converted to CAD daily. Category -> example Canadian-listed funds (verify the
+# exact fund, its currency hedging and fees before any real trade).
+CAD_MAP = {
+    "SPY": ("US large companies (S&P 500), unhedged", "e.g. VFV, XUS, ZSP"),
+    "IWM": ("US small companies, unhedged", "limited choice; verify"),
+    "EFA": ("International developed markets", "e.g. XEF"),
+    "EEM": ("Emerging markets", "e.g. XEC, ZEM"),
+    "TLT": ("Long-term US Treasuries, unhedged", "verify availability and hedging"),
+    "IEF": ("Intermediate US Treasuries, unhedged", "verify availability and hedging"),
+    "GLD": ("Gold, unhedged", "verify; several gold-bullion funds exist"),
+    "DBC": ("Broad commodities", "no close Canadian equivalent: bought in US$ with currency conversion"),
+    "VNQ": ("US real estate (REITs), unhedged", "verify"),
+}
+CAD_COST = 0.0010        # per side: $0 commission at many Canadian discount brokers + wider CAD spreads
+FX_CONVERSION = 0.015    # per side on assets with no Canadian equivalent (typical bank FX spread)
+NO_CAD_EQUIV = ("DBC",)
+
+
+def _cad_prices(cfg: SleeveConfig, start: str):
+    opens, closes, marks, cash = _prices(cfg, start)
+    fx = data.load("FX_USDCAD").reindex(closes.index.union(data.load("FX_USDCAD").index)).ffill()
+    fo, fc = fx["open"].reindex(closes.index), fx["close"].reindex(closes.index)
+    return opens.mul(fo, axis=0), closes.mul(fc, axis=0), marks.mul(fc, axis=0), cash
+
+
+def _simulate_cost_by_asset(cfg, opens, closes, marks, cash, decisions, per_asset_cost: dict) -> tuple:
+    """Like _simulate, but each asset can carry its own per-side cost. Returns (equity, costs_paid)."""
+    from .engine import execute
+    pf = Portfolio(cash=cfg.capital, peak_equity=cfg.capital)
+    eq, pending, paid = [], None, 0.0
+    idx = closes.index
+    for i, d in enumerate(idx):
+        if pending is not None:
+            for a, c in per_asset_cost.items():   # trade asset groups at their own cost
+                sub = {k: v for k, v in pending.items() if per_asset_cost.get(k, CAD_COST) == c and k == a}
+                if sub:
+                    fills = execute(pf, sub, opens.iloc[i].to_dict(), d, _cfg_with_cost(cfg, c),
+                                    ref_prices=marks.iloc[i - 1].to_dict() if i else {})
+                    paid += sum(f.cost_usd for f in fills)
+            pending = None
+        if cash is not None and pf.cash > 0:
+            pf.cash *= 1 + float(cash.iloc[i])
+        eq.append(pf.equity(marks.iloc[i].to_dict()))
+        if d in decisions:
+            pending = decisions[d]
+    return pd.Series(eq, index=idx), paid
+
+
+def cad_mirror(events: list[dict]) -> dict | None:
+    """The ETF Trend Follower's own decisions, held as Canadian-listed equivalents, in CAD."""
+    decs = [e["data"] for e in events if e["type"] == "decision" and e["data"]["arm"] == "etf_trend"]
+    if not decs:
+        return None
+    try:
+        data.load("FX_USDCAD")
+    except data.DataError:
+        return None
+    cfg = replace(SLEEVES["etf_trend"], capital=5000.0)
+    start = decs[0]["date"]
+    opens, closes, marks, cash = _cad_prices(cfg, start)
+    if len(closes) < 2:
+        return None
+    decisions = {pd.Timestamp(x["date"]): {k: (np.nan if v is None else v) for k, v in x["target"].items()}
+                 for x in decs}
+    costs = {a: (CAD_COST + FX_CONVERSION if a in NO_CAD_EQUIV else CAD_COST) for a in cfg.assets}
+    eq, paid = _simulate_cost_by_asset(cfg, opens, closes, marks, cash, decisions, costs)
+    fx = data.load("FX_USDCAD")["close"]
+    fx_move = float(fx[fx.index <= closes.index[-1]].iloc[-1] / fx[fx.index <= closes.index[0]].iloc[-1] - 1)
+    # Simple CAD benchmarks: buy & hold S&P 500 (unhedged) and 60/40, converted to CAD.
+    bench = {}
+    for name, spec in {"Buy & Hold: S&P 500 (CAD)": {"SPY": 1.0},
+                       "Buy & Hold: 60/40 (CAD)": {"SPY": 0.6, "AGG": 0.4}}.items():
+        bcfg = replace(cfg, assets=tuple(spec), max_weight=1.0, rebalance_band=0.10)
+        bo, bc, bm, _ = _cad_prices(bcfg, start)
+        beq, _ = _simulate_cost_by_asset(bcfg, bo, bc, bm, None, {bc.index[0]: spec}, {a: CAD_COST for a in spec})
+        bench[name] = [[str(d.date()), round(float(v), 2)] for d, v in beq.items()]
+    return {"series": [[str(d.date()), round(float(v), 2)] for d, v in eq.items()],
+            "return": float(eq.iloc[-1] / eq.iloc[0] - 1), "costs_cad": round(paid, 2),
+            "usdcad_change": fx_move, "benchmarks": bench,
+            "assumptions": {"per_side_cost": CAD_COST, "fx_conversion_per_side_no_equivalent": FX_CONVERSION,
+                            "no_canadian_equivalent": list(NO_CAD_EQUIV)},
+            "map": {k: {"category": v[0], "examples": v[1]} for k, v in CAD_MAP.items()}}
+
+
 def build(ledger_path: Path, state_dir: Path, start: str | None) -> dict:
     """Everything the dashboard/report needs, as plain JSON-able data."""
     events = [json.loads(l) for l in ledger_path.read_text().splitlines() if l.strip()] if ledger_path.exists() else []
@@ -183,6 +269,10 @@ def build(ledger_path: Path, state_dir: Path, start: str | None) -> dict:
         if s is not None and len(s) > 1:
             out["shadow"][arm] = [[str(d.date()), float(v)] for d, v in s.items()]
     out["costs"] = cost_sensitivity(events)
+    try:
+        out["cad"] = cad_mirror(events)
+    except Exception as exc:  # report-only
+        out["cad"] = {"error": f"{type(exc).__name__}: {exc}"}
     if not start:
         return out
     for sleeve in SLEEVES:

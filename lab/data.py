@@ -88,6 +88,21 @@ def fetch_coinbase(product: str, start: str) -> pd.DataFrame:
     return df[COLS].astype(float)
 
 
+def fetch_tiingo_fx(pair: str, start: str) -> pd.DataFrame:
+    """Daily FX (e.g. usdcad) from Tiingo; history starts 2020-01-01."""
+    key = os.environ.get("TIINGO_API_KEY", "proxy-injected")
+    rows = _get(f"https://api.tiingo.com/tiingo/fx/{pair}/prices",
+                params={"startDate": max(start, "2020-01-01"), "resampleFreq": "1day"},
+                headers={"Authorization": f"Token {key}"})
+    if not rows:
+        raise DataError(f"Tiingo returned no FX rows for {pair}")
+    df = pd.DataFrame(rows)
+    df["date"] = pd.to_datetime(df["date"]).dt.tz_localize(None).dt.normalize()
+    out = df.set_index("date")[["open", "high", "low", "close"]].astype(float)
+    out["volume"] = 0.0
+    return out.sort_index()
+
+
 # --------------------------------------------------------------------------- cache
 def _path(symbol: str) -> Path:
     return DATA_DIR / f"{symbol.replace('/', '_')}.csv"
@@ -106,7 +121,12 @@ def refresh(symbol: str, start: str) -> pd.DataFrame:
     We re-download the full history rather than appending, because adjusted
     ETF prices are restated whenever a dividend is paid.
     """
-    df = fetch_coinbase(symbol, start) if symbol.endswith("-USD") else fetch_tiingo(symbol, start)
+    if symbol.startswith("FX_"):
+        df = fetch_tiingo_fx(symbol[3:].lower(), start)
+    elif symbol.endswith("-USD"):
+        df = fetch_coinbase(symbol, start)
+    else:
+        df = fetch_tiingo(symbol, start)
     problems = validate(df)
     if problems:
         raise DataError(f"{symbol}: " + "; ".join(problems))

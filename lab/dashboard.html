@@ -79,7 +79,7 @@ details>summary{cursor:pointer;font-weight:700;list-style:none}details>summary::
 details>summary::before{content:"▸ ";color:var(--muted)}details[open]>summary::before{content:"▾ "}
 .verdicts{list-style:none;margin:10px 0 0;padding:0}.verdicts li{padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
 .ok{background:var(--goodbg);color:var(--good)}.no{background:var(--badbg);color:var(--bad)}.wn{background:var(--warnbg);color:var(--warn)}
-#healthTable td,#costs th,#costs td{white-space:normal}#healthTable td.num{text-align:right}
+#healthTable td,#costs th,#costs td,#cadTable td,#cadMap td{white-space:normal}#healthTable td.num{text-align:right}
 .empty{padding:36px 8px;text-align:center;color:var(--muted)}
 footer{font-size:13px;color:var(--muted)}footer a{color:var(--text-2)}
 @media (prefers-reduced-motion:no-preference){.card{transition:border-color .15s}}
@@ -153,6 +153,13 @@ footer{font-size:13px;color:var(--muted)}footer a{color:var(--text-2)}
     <h2>System health</h2>
     <div class="scroll"><table id="healthTable"></table></div>
   </div>
+</section>
+
+<section class="card" style="display:flex;flex-direction:column;gap:12px">
+  <div class="sechead"><h2>Canadian mirror (in CAD)</h2><span class="small muted">Paper only · report-only</span></div>
+  <p class="small muted">What the US ETF Trend Follower's own decisions would have done if held as Canadian-listed equivalents in Canadian dollars, with Canadian costs. This is the version a real pilot would trade.</p>
+  <div class="grid2"><div class="scroll" id="cadTable"></div><div class="chart" id="cadChart"></div></div>
+  <details><summary class="small">Which Canadian funds, and the assumptions</summary><div class="scroll" id="cadMap" style="margin-top:8px"></div></details>
 </section>
 
 <section class="card"><details><summary>Locked three-year test (Nov 2023 – Nov 2026): what history says</summary><div class="grid2" id="holdout" style="margin-top:12px"></div></details></section>
@@ -327,8 +334,21 @@ function renderHoldout(){
   $("holdout").innerHTML=Object.entries(DATA.holdout).sort(([a])=>a.startsWith("etf")?-1:1).map(([k,v])=>`<div><h3>${k.startsWith("etf")?"US ETFs":"Crypto"}: Trend Follower</h3><ul class="verdicts">${Object.entries(v.verdict).map(([q,r])=>`<li><span class="chip ${r.met?"ok":"no"}">${r.met?"Met":"Not met"}</span> ${esc(q)} <span class="muted small">${esc(r.detail)}</span></li>`).join("")}</ul></div>`).join("");
 }
 
+function renderCad(){
+  const c=DATA.cad;
+  if(!c||c.error||!c.series){$("cadTable").innerHTML='<div class="empty">Appears after the ETF Trend Follower\'s first decision.</div>';$("cadChart").innerHTML="";$("cadMap").innerHTML="";return;}
+  const usd=P.etf_trend, br=(k)=>{const s=c.benchmarks[k];return s&&s.length>1?s[s.length-1][1]/s[0][1]-1:null;};
+  const rows=[["Trend Follower, Canadian mirror (CAD)",c.return],["Trend Follower, US version (USD)",usd&&usd.ret],["Buy & Hold: S&P 500 (CAD)",br("Buy & Hold: S&P 500 (CAD)")],["Buy & Hold: 60/40 (CAD)",br("Buy & Hold: 60/40 (CAD)")]];
+  $("cadTable").innerHTML=`<table><tbody>${rows.map(([n,v])=>`<tr><td>${esc(n)}</td><td class="num ${cls(v)}">${pct(v)}</td></tr>`).join("")}
+    <tr><td>Costs paid in the mirror</td><td class="num">C$${c.costs_cad.toFixed(2)}</td></tr><tr><td>US dollar vs Canadian dollar over the period</td><td class="num">${pct(c.usdcad_change)}</td></tr></tbody></table>`;
+  const v=c.series.map(x=>x[1]);
+  if(v.length>1){const W=480,H=120,lo=Math.min(...v,5000),hi=Math.max(...v,5000),y=(t)=>H-6-(H-12)*((t-lo)/((hi-lo)||1)),x=(i)=>i*(W/(v.length-1));
+    $("cadChart").innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Canadian mirror value in CAD"><line x1="0" x2="${W}" y1="${y(5000)}" y2="${y(5000)}" stroke="${css('--muted')}" stroke-dasharray="2 4"/><path d="${v.map((t,i)=>(i?"L":"M")+x(i).toFixed(1)+" "+y(t).toFixed(1)).join(" ")}" fill="none" stroke="${css('--s1')}" stroke-width="2.2"/><text x="${W}" y="12" text-anchor="end" font-size="11" fill="${css('--muted')}">C$${v[v.length-1].toLocaleString()}</text></svg>`;}
+  $("cadMap").innerHTML=`<table><thead><tr><th>US fund</th><th>What it holds</th><th>Canadian-listed examples</th></tr></thead><tbody>${Object.entries(c.map).map(([k,m])=>`<tr><td>${esc(k)}</td><td>${esc(m.category)}</td><td>${esc(m.examples)}</td></tr>`).join("")}</tbody></table>
+    <p class="small muted" style="margin-top:8px">Assumes unhedged Canadian-listed funds tracking the same index (so returns are the US fund converted to CAD daily), ${(c.assumptions.per_side_cost*100).toFixed(2)}% cost per trade, and ${(c.assumptions.fx_conversion_per_side_no_equivalent*100).toFixed(1)}% extra currency-conversion cost per trade for ${esc(c.assumptions.no_canadian_equivalent.join(", "))}. Fund fees and US dividend withholding tax are not modelled. Verify each fund before any real trade.</p>`;
+}
 function renderMarket(){renderTabs();renderChart();renderTable();renderBars();renderHoldings();renderFeed();renderCosts();}
-function renderAll(){renderSystems();renderMarket();renderHealth();renderHoldout();}
+function renderAll(){renderSystems();renderMarket();renderHealth();renderHoldout();renderCad();}
 renderAll();
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change",renderAll);
 })();

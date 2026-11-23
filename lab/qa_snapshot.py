@@ -70,6 +70,7 @@ def build() -> Path:
         "portfolios": portfolios,
         "luck_ranking": an.get("random", {}),
         "cost_sensitivity": an.get("costs", {}),
+        "canadian_mirror": {k: v for k, v in (an.get("cad") or {}).items() if k != "series"} or None,
         "holdout": d["holdout"]["sleeves"] if d["holdout"] else None,
         "decisions": decisions[-150:],
         "trades": trades[-300:],
@@ -79,6 +80,8 @@ def build() -> Path:
             "decisions_log": _doc("docs/DECISIONS.md", 40000),
             "status": _doc("docs/STATUS.md"),
             "candidate_improvements": _doc("docs/IMPROVEMENTS.md"),
+            "live_pilot_plan": _doc("docs/LIVE_PILOT_PLAN.md"),
+            "plan_addendum_canadian_mirror": _doc("docs/PREREGISTRATION_ADDENDUM_CAD.md"),
             "latest_weekly_report": weekly[-1].read_text()[:20000] if weekly else "",
         },
     }

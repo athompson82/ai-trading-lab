@@ -106,7 +106,7 @@ button.ghost{background:transparent;color:var(--ink-2);border:1px solid var(--li
       snapshot_taken_utc: d.generated_utc, phase: d.phase, phase_detail: d.phase_detail, forward_start: d.forward_start,
       reliability: d.reliability, ai_spend_total_usd: d.ai_spend_total_usd,
       portfolios: d.portfolios.map(({equity_history, ...p}) => p),
-      luck_ranking: d.luck_ranking, cost_sensitivity: d.cost_sensitivity,
+      luck_ranking: d.luck_ranking, cost_sensitivity: d.cost_sensitivity, canadian_mirror: d.canadian_mirror,
       holdout_verdicts: d.holdout && Object.fromEntries(Object.entries(d.holdout).map(([k, v]) => [k, v.verdict])),
       recent_decisions: toolsOk ? undefined : d.decisions.slice(-12),
     };
@@ -143,7 +143,7 @@ ${JSON.stringify(core())}`;
     {name: "get_value_history", description: "Daily closing value (USD) of one portfolio, as [date, value] pairs, last 120 days.",
      inputSchema: {type: "object", properties: {portfolio: {type: "string"}}, required: ["portfolio"]},
      execute: (i) => { const p = DATA.portfolios.find((x) => x.id === String(i.portfolio)); if (!p) throw new Error("unknown portfolio id"); return p.equity_history; }},
-    {name: "get_document", description: "Read a project document in 10,000-character parts. Names: plan_v1 (pre-registered rules and success criteria), plan_addendum_ai (AI trader rules), decisions_log (every decision and why), status, candidate_improvements, latest_weekly_report.",
+    {name: "get_document", description: "Read a project document in 10,000-character parts. Names: plan_v1 (pre-registered rules and success criteria), plan_addendum_ai (AI trader rules), plan_addendum_canadian_mirror, live_pilot_plan (how a real-money pilot would work), decisions_log (every decision and why), status, candidate_improvements, latest_weekly_report.",
      inputSchema: {type: "object", properties: {name: {type: "string"}, part: {type: "integer", description: "1-based"}}, required: ["name"]},
      execute: (i) => { const t = DATA.documents[String(i.name)]; if (t == null) throw new Error("unknown document"); const p = Math.max(1, Number(i.part) || 1);
        return {part: p, parts: Math.max(1, Math.ceil(t.length / 10000)), text: t.slice((p - 1) * 10000, p * 10000)}; }},
