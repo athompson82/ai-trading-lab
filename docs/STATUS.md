@@ -67,6 +67,7 @@ to answer Q4 and the AI A/B question.
 - Weekly (Mondays): `reports/weekly/`, also posted as a GitHub issue; candidate improvements are collected in `docs/IMPROVEMENTS.md`.
 - Hourly: alert watcher (big price moves, overdue nightly run) posts GitHub issues; alerts only.
 - Weekly (Mondays ~04:07 UTC): Claude's check-in: health review, fixes, plain-English summary and recommendations.
+- Questions: private page "Ask the Trading Lab" (https://claude.ai/artifact/FndLCFizNc6Y7xAzXkJ4Z2), with its snapshot refreshed weekly.
 - Day 60 (2027-02-12): interim report, plus selection of version-2 candidates with the owner.
 
 ## Blocked on owner

@@ -1,0 +1,212 @@
+<title>Ask the Trading Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single reading column; status strip, suggested questions, conversation, composer pinned at the bottom. */
+:root{
+  --bg:#f6f7f5; --surface:#ffffff; --ink:#15201b; --ink-2:#4a5752; --muted:#7b8782; --line:#dfe4e0;
+  --accent:#1f6f54; --accent-ink:#ffffff; --accent-soft:#e3f1ea; --you:#eef2f0; --warn:#9a5b00; --warn-soft:#fbf0dc;
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1513; --surface:#161e1b; --ink:#e6ece9; --ink-2:#b4c0bb; --muted:#84918c; --line:#28332f;
+  --accent:#57c29a; --accent-ink:#0b1310; --accent-soft:#18342a; --you:#1c2623; --warn:#f0b45a; --warn-soft:#33270f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1513; --surface:#161e1b; --ink:#e6ece9; --ink-2:#b4c0bb; --muted:#84918c; --line:#28332f;
+  --accent:#57c29a; --accent-ink:#0b1310; --accent-soft:#18342a; --you:#1c2623; --warn:#f0b45a; --warn-soft:#33270f; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--font-body);margin:0}
+.wrap{max-width:760px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;gap:16px;
+  padding-block:20px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header h1{font-size:22px;font-weight:600;margin:0;text-wrap:balance}
+header p{margin:4px 0 0;color:var(--ink-2)}
+.status{display:flex;flex-wrap:wrap;gap:6px 14px;font:12.5px/1.4 var(--font-mono);color:var(--muted)}
+.status b{color:var(--ink-2);font-weight:500}
+.note{background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:13.5px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:6px 12px;font:inherit;font-size:13.5px;cursor:pointer;text-align:left}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.chip:focus-visible,button:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#log{display:flex;flex-direction:column;gap:14px;flex:1;min-width:0}
+.msg{max-width:100%;min-width:0}
+.msg.you{align-self:flex-end;background:var(--you);border-radius:12px 12px 2px 12px;padding:8px 12px;max-width:85%;white-space:pre-wrap}
+.msg.bot{border-left:2px solid var(--accent);padding:2px 0 2px 14px}
+.msg.bot p{margin:0 0 8px}.msg.bot ul,.msg.bot ol{margin:0 0 8px;padding-left:20px}
+.msg.bot code{font:13px var(--font-mono);background:var(--accent-soft);padding:1px 4px;border-radius:4px}
+.msg.bot .meta{font:12px var(--font-mono);color:var(--muted)}
+.msg.err{color:var(--warn)}
+.empty{color:var(--muted);font-size:14px}
+form{position:sticky;bottom:0;background:var(--bg);padding:10px 0 calc(14px + env(safe-area-inset-bottom,0px));display:flex;gap:8px;align-items:flex-end;border-top:1px solid var(--line)}
+textarea{flex:1;min-width:0;resize:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:10px 12px;font:inherit;max-height:160px}
+button.primary{background:var(--accent);color:var(--accent-ink);border:0;border-radius:10px;padding:10px 16px;font:inherit;font-weight:600;cursor:pointer}
+button.primary:disabled{opacity:.5;cursor:default}
+button.ghost{background:transparent;color:var(--ink-2);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font:inherit;cursor:pointer}
+@media (prefers-reduced-motion:no-preference){.msg{animation:in .18s ease-out}@keyframes in{from{opacity:.4;transform:translateY(3px)}to{opacity:1;transform:none}}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Ask the Trading Lab</h1>
+    <p>Questions about the paper-trading experiment, answered from its own records in plain English.</p>
+  </header>
+  <div class="status" id="status"><span>Loading the latest snapshot…</span></div>
+  <div class="note" id="note" hidden></div>
+  <div class="chips" id="chips">
+    <button class="chip" type="button">How is each portfolio doing so far, in plain English?</button>
+    <button class="chip" type="button">What did the AI trader decide most recently, and why?</button>
+    <button class="chip" type="button">Is anything beating luck yet?</button>
+    <button class="chip" type="button">What is a drawdown, and which portfolio had the worst one?</button>
+    <button class="chip" type="button">How much are trading costs eating into returns?</button>
+    <button class="chip" type="button">What did the three-year holdout test show?</button>
+  </div>
+  <div id="log" aria-live="polite"><p class="empty" id="empty">Ask anything about the portfolios, trades, the AI's reasoning, the rules, or what a term means. Answers use the snapshot shown above, not live prices.</p></div>
+  <form id="form">
+    <label for="q" class="sr" hidden>Your question</label>
+    <textarea id="q" rows="1" placeholder="Ask a question…"></textarea>
+    <button class="ghost" type="button" id="stop" hidden>Stop</button>
+    <button class="primary" type="submit" id="send">Ask</button>
+  </form>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  let DATA = null, sample = null, toolsOk = false, ctl = null, busy = false;
+  const turns = [];  // {role, content}, kept short
+
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+  // Minimal, safe Markdown: escape first, then bold, inline code, bullet/numbered lists, paragraphs.
+  function md(text) {
+    const lines = esc(text).split("\n"); let html = "", list = null;
+    const inline = (s) => s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`([^`]+)`/g, "<code>$1</code>");
+    const close = () => { if (list) { html += `</${list}>`; list = null; } };
+    for (const raw of lines) {
+      const l = raw.trimEnd(); let m;
+      if ((m = l.match(/^\s*[-*]\s+(.*)/))) { if (list !== "ul") { close(); html += "<ul>"; list = "ul"; } html += `<li>${inline(m[1])}</li>`; }
+      else if ((m = l.match(/^\s*\d+[.)]\s+(.*)/))) { if (list !== "ol") { close(); html += "<ol>"; list = "ol"; } html += `<li>${inline(m[1])}</li>`; }
+      else if (!l.trim()) { close(); }
+      else { close(); html += `<p>${inline(l.replace(/^#+\s*/, ""))}</p>`; }
+    }
+    close(); return html;
+  }
+
+  function add(kind, text) {
+    $("empty")?.remove();
+    const el = document.createElement("div"); el.className = "msg " + kind;
+    if (kind === "you") el.textContent = text; else el.innerHTML = md(text);
+    $("log").append(el); el.scrollIntoView({block: "end", behavior: "smooth"}); return el;
+  }
+
+  function core() {
+    const d = DATA;
+    return {
+      snapshot_taken_utc: d.generated_utc, phase: d.phase, phase_detail: d.phase_detail, forward_start: d.forward_start,
+      reliability: d.reliability, ai_spend_total_usd: d.ai_spend_total_usd,
+      portfolios: d.portfolios.map(({equity_history, ...p}) => p),
+      luck_ranking: d.luck_ranking, cost_sensitivity: d.cost_sensitivity,
+      holdout_verdicts: d.holdout && Object.fromEntries(Object.entries(d.holdout).map(([k, v]) => [k, v.verdict])),
+      recent_decisions: toolsOk ? undefined : d.decisions.slice(-12),
+    };
+  }
+
+  const RULES = () => `You are the assistant for "AI Trading Lab", a pre-registered PAPER-TRADING experiment (simulated money only; nothing is real). The owner is new to trading.
+How to answer:
+- Plain English, short paragraphs or bullets. Define any trading term the first time you use it.
+- Use ONLY the data below and what your tools return. Never invent numbers, trades or reasons. If something isn't in the data, say so.
+- Cite dates and which portfolio you mean (e.g. "crypto trend strategy on 2026-12-02").
+- Be honest about noise: results over days or weeks are mostly luck; the "Better than luck?" ranking (beat X% of 1,000 random portfolios) and the pre-registered criteria are the evidence that matters.
+- Don't give personal financial advice about real money; you can explain what the experiment shows and what the plan says a real-money pilot would require.
+- The data is a snapshot taken ${DATA.generated_utc} UTC; say so if a question needs fresher information (the live dashboard is https://athompson82.github.io/ai-trading-lab/).
+Portfolio ids: etf_* = US ETF sleeve, crypto_* = Bitcoin/Ether sleeve; *_trend = rules-based trend strategy; *_trend_ai = trend + weekly AI risk overlay (can only reduce risk); *_ai_trader = AI deciding daily from news and trends; *_bench_* = passive buy-and-hold benchmarks. Each started with US$5,000.
+${toolsOk ? "Use the tools for decision history (including the AI's written reasoning and the news it cited), trades, value history, and the plan/decision documents." : ""}
+
+CURRENT DATA (JSON):
+${JSON.stringify(core())}`;
+
+  const pick = (arr, input, max) => {
+    let out = arr;
+    if (input.portfolio) out = out.filter((x) => x.portfolio === String(input.portfolio));
+    if (input.since) out = out.filter((x) => x.date >= String(input.since));
+    const n = Math.min(Math.max(Number(input.limit) || 10, 1), max);
+    return out.slice(-n);
+  };
+  const TOOLS = () => [
+    {name: "get_decisions", description: "Decision history (newest last): target weights, risk-manager notes, and for AI portfolios the AI's rationale, key news and confidence. Filter by portfolio id and/or since date (YYYY-MM-DD).",
+     inputSchema: {type: "object", properties: {portfolio: {type: "string"}, since: {type: "string"}, limit: {type: "integer", description: "max 15"}}},
+     execute: (i) => pick(DATA.decisions, i, 15)},
+    {name: "get_trades", description: "Simulated trades (newest last): date, portfolio, asset, buy/sell, amount, market price, cost paid. Filter by portfolio id and/or since date.",
+     inputSchema: {type: "object", properties: {portfolio: {type: "string"}, since: {type: "string"}, limit: {type: "integer", description: "max 60"}}},
+     execute: (i) => pick(DATA.trades, i, 60)},
+    {name: "get_value_history", description: "Daily closing value (USD) of one portfolio, as [date, value] pairs, last 120 days.",
+     inputSchema: {type: "object", properties: {portfolio: {type: "string"}}, required: ["portfolio"]},
+     execute: (i) => { const p = DATA.portfolios.find((x) => x.id === String(i.portfolio)); if (!p) throw new Error("unknown portfolio id"); return p.equity_history; }},
+    {name: "get_document", description: "Read a project document in 10,000-character parts. Names: plan_v1 (pre-registered rules and success criteria), plan_addendum_ai (AI trader rules), decisions_log (every decision and why), status, candidate_improvements, latest_weekly_report.",
+     inputSchema: {type: "object", properties: {name: {type: "string"}, part: {type: "integer", description: "1-based"}}, required: ["name"]},
+     execute: (i) => { const t = DATA.documents[String(i.name)]; if (t == null) throw new Error("unknown document"); const p = Math.max(1, Number(i.part) || 1);
+       return {part: p, parts: Math.max(1, Math.ceil(t.length / 10000)), text: t.slice((p - 1) * 10000, p * 10000)}; }},
+  ];
+
+  function setBusy(b) { busy = b; $("send").disabled = b; $("stop").hidden = !b; }
+
+  async function ask(question) {
+    if (busy || !question.trim()) return;
+    if (!sample || !DATA) return;
+    add("you", question);
+    turns.push({role: "user", content: question});
+    while (turns.length > 8) turns.shift();
+    if (turns[0].role !== "user") turns.shift();
+    const out = add("bot", "Thinking…");
+    ctl = new AbortController(); setBusy(true);
+    const opts = {signal: ctl.signal, cache: false, onText: ({text}) => { out.innerHTML = md(text); }};
+    if (toolsOk) { opts.tools = TOOLS(); delete opts.cache; }
+    try {
+      const {text, truncated} = await sample([{role: "user", content: RULES()}, ...turns], opts);
+      out.innerHTML = md(text) + (truncated ? `<p class="meta">Answer cut short. Try a narrower question.</p>` : "");
+      turns.push({role: "assistant", content: text});
+    } catch (e) {
+      const keep = e && e.text ? md(e.text) : "";
+      const why = {
+        cancelled: "Stopped.", rate_limited: "Too many questions at once, or your Claude usage limit was reached. Try again in a little while.",
+        not_granted: "This page needs your permission to use Claude. Reload to be asked again.",
+        sampling_disabled: "Claude isn't available to this account here.", prompt_too_large: "That needed too much data at once. Try a narrower question.",
+        refused: "Claude declined that question. Try rephrasing it.",
+      }[e && e.code] || "Something went wrong reaching Claude. Try again.";
+      out.innerHTML = keep + `<p class="meta">${esc(why)}</p>`;
+      if (!keep) out.classList.add("err");
+      turns.pop();
+      if (e && (e.code === "not_granted" || e.code === "sampling_disabled")) { $("form").hidden = true; $("chips").hidden = true; }
+    } finally { setBusy(false); }
+  }
+
+  $("form").addEventListener("submit", (ev) => { ev.preventDefault(); const q = $("q").value; $("q").value = ""; ask(q); });
+  $("q").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); $("form").requestSubmit(); } });
+  $("q").addEventListener("input", () => { const t = $("q"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 160) + "px"; });
+  $("stop").addEventListener("click", () => ctl?.abort());
+  document.querySelectorAll(".chip").forEach((b) => b.addEventListener("click", () => ask(b.textContent)));
+
+  async function boot() {
+    try {
+      const r = await fetch("data.json", {cache: "no-store"});
+      DATA = await r.json();
+      const ageDays = (Date.now() - Date.parse(DATA.generated_utc.replace(" ", "T") + ":00Z")) / 864e5;
+      $("status").innerHTML = "";
+      for (const [k, v] of [["Snapshot", DATA.generated_utc + " UTC"], ["Phase", DATA.phase], ["Portfolios with data", String(DATA.portfolios.length)]]) {
+        const s = document.createElement("span"); s.innerHTML = `<b>${esc(k)}:</b> `; s.append(document.createTextNode(v)); $("status").append(s);
+      }
+      if (ageDays > 8) { $("note").hidden = false; $("note").textContent = `This snapshot is ${Math.floor(ageDays)} days old. Ask Claude in your project chat to refresh it.`; }
+    } catch { $("status").textContent = "Couldn't load the data snapshot."; }
+    sample = window.claude ? await window.claude.use("sample") : null;
+    if (!sample) {
+      $("form").hidden = true; $("chips").hidden = true;
+      $("note").hidden = false; $("note").textContent = "Asking questions works when this page is opened in Claude (claude.ai or the Claude app).";
+      return;
+    }
+    const lim = await sample.limits().catch(() => null);
+    toolsOk = !!(lim && lim.tools);
+  }
+  boot();
+})();
+</script>

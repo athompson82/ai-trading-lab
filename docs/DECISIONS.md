@@ -34,6 +34,7 @@ objectives need the project owner's approval.
 | D-026 | 2026-11-23 | Hourly alert watcher (BTC/ETH ±10% in 24h, SPY −4% on the day, nightly run >30h overdue) posting GitHub issues. Alerts only, never trades. | Owner wants to be informed in near real time; trading faster wouldn't help these slow strategies and would break the frozen rules. | Approved by owner |
 | D-027 | 2026-11-23 | Plain-English section in the weekly report and a "How to read this page" guide on the dashboard. | Owner is new to trading. | Approved by owner |
 | D-028 | 2026-11-23 | Weekly check-in by Claude (Mondays 04:07 UTC, after the weekly report). Claude fixes operational/reporting issues on its own and logs them; anything changing how a portfolio trades, budget, risk or scope goes to the owner as a recommendation. | Owner asked Claude to monitor and suggest adjustments; the split keeps the test verifiable. | Approved by owner |
+| D-029 | 2026-11-23 | Private Q&A page ("Ask the Trading Lab", a Claude artifact visible only to the owner) instead of a chatbot on the public dashboard. It answers from `qa/data.json` (built by `lab/qa_snapshot.py`), refreshed at Claude's weekly check-in or on request. | A chatbot on the public page would need the API key exposed or a hosted backend with authentication. The private page uses the owner's Claude plan, with no key, no new infrastructure and no public cost exposure. | Approved by owner |
 
 ## Observations worth remembering
 
