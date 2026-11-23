@@ -69,10 +69,16 @@ def build(use_ai: bool = True, client=None) -> tuple[str, Path]:
          "## Performance", "",
          "| Portfolio | Value | This week | Since start | Worst drop | Trades (week) | Costs (week) |",
          "|---|---:|---:|---:|---:|---:|---:|"]
+    if not rows:
+        L.append("| _All portfolios_ | $5,000.00 each | n/a | n/a | n/a | 0 | $0.00 |")
+        L += ["", "_No completed trading days yet. Every portfolio starts at US$5,000 in cash; the first decisions "
+                  "are made at the first nightly run after the forward start date._"]
     for r in rows:
         L.append(f"| {_label(r['arm'])} | ${r['value']:,.2f} | {r['week']:+.2%} | {r['total']:+.2%} | "
                  f"{r['max_dd']:.1%} | {r['trades_week']} | ${r['costs_week']:,.2f} |")
     L += ["", "## Better than luck?", ""]
+    if not an.get("random"):
+        L += ["_Not computed yet: needs at least a few trading days since the forward start._", ""]
     for sleeve, rb in an.get("random", {}).items():
         L.append(f"**{'ETF' if sleeve.startswith('etf') else 'Crypto'}**: 1,000 random portfolios returned "
                  f"{rb['pct']['5']:+.1%} to {rb['pct']['95']:+.1%} (middle 90%).")
@@ -97,7 +103,9 @@ def build(use_ai: bool = True, client=None) -> tuple[str, Path]:
     L += ["", "## Reliability", "",
           f"- Nightly runs completed: {rel['completed']} of {rel['expected']}; missed: "
           f"{', '.join(rel['missed'][-7:]) or 'none'}; data errors: {rel['errors']}.",
-          f"- Ledger tamper check: {'passed' if d['chain_ok'] else 'FAILED'} ({d['chain_msg']}).",
+          f"- Ledger tamper check: {'passed' if d['chain_ok'] else 'FAILED'} ({d['chain_msg']}; entries: "
+          + ", ".join(f"{k} {v}" for k, v in sorted(pd.Series([e['type'] for e in events]).value_counts().items()))
+          + ").",
           f"- Risk-manager actions this week: {len(risk_notes)}."]
     for arm, dt, n in risk_notes[:10]:
         L.append(f"  - {dt} {_label(arm)}: {n}")
