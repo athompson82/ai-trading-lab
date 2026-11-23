@@ -273,10 +273,13 @@ ul.verdicts{list-style:none;padding:0;margin:0}ul.verdicts li{padding:5px 0;bord
 .tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;
 font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.12);display:none;white-space:nowrap;z-index:2}
 .empty{padding:40px 8px;text-align:center;color:var(--muted)}
+.askbtn{display:inline-block;background:var(--s1);color:#fff;text-decoration:none;font-weight:600;padding:8px 14px;border-radius:8px;margin-right:6px}
+.askbtn:focus-visible{outline:2px solid var(--text);outline-offset:2px}
 details summary{cursor:pointer;color:var(--text2)}footer{margin-top:40px;font-size:13px;color:var(--muted)}a{color:var(--s1)}
 </style></head><body><main>
 <h1>AI Trading Lab</h1>
 <p class=muted>Pre-registered paper-trading experiment · <strong>simulated money only</strong> · updated {{GENERATED}}</p>
+<p><a class=askbtn href="https://claude.ai/artifact/FndLCFizNc6Y7xAzXkJ4Z2" target="_blank" rel="noopener">Ask a question about this experiment</a> <span class="muted small">Opens the owner's private Q&amp;A page in Claude; sign in to claude.ai first.</span></p>
 <div class=banner><strong>{{PHASE}}.</strong> {{PHASE_DETAIL}} Short-term results are dominated by luck: over 90 days a Sharpe ratio is uncertain by about ±2, so judge this test mainly on reliability and on consistency with the backtest.</div>
 
 <div class=tiles>
