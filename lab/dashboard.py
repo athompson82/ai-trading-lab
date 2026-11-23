@@ -29,11 +29,12 @@ SLEEVES = {
                                                   "crypto_bench_btc_eth_50_50", "crypto_ai_trader"]},
 }
 LABELS = {
-    "etf_trend": "Trend strategy", "etf_trend_ai": "Trend + AI overlay", "etf_bench_spy": "S&P 500 (SPY)",
-    "etf_bench_60_40": "60/40 stocks/bonds", "crypto_trend": "Trend strategy", "crypto_trend_ai": "Trend + AI overlay",
-    "crypto_bench_btc": "Bitcoin", "crypto_bench_btc_eth_50_50": "50/50 BTC/ETH",
-    "etf_ai_trader": "AI trader (news + trends)", "crypto_ai_trader": "AI trader (news + trends)",
-    "mf_DBMF": "Managed-futures ETF DBMF (buy & hold)", "mf_KMLM": "Managed-futures ETF KMLM (buy & hold)",
+    "etf_trend": "Trend Follower", "etf_trend_ai": "Trend Follower + News Guard", "etf_ai_trader": "News-Driven AI",
+    "etf_bench_spy": "Buy & Hold: S&P 500", "etf_bench_60_40": "Buy & Hold: 60/40 stocks/bonds",
+    "crypto_trend": "Trend Follower", "crypto_trend_ai": "Trend Follower + News Guard",
+    "crypto_ai_trader": "News-Driven AI", "crypto_bench_btc": "Buy & Hold: Bitcoin",
+    "crypto_bench_btc_eth_50_50": "Buy & Hold: 50/50 Bitcoin/Ether",
+    "mf_DBMF": "Managed-futures fund DBMF (buy & hold)", "mf_KMLM": "Managed-futures fund KMLM (buy & hold)",
 }
 
 
@@ -105,281 +106,163 @@ def _esc(x) -> str:
     return html.escape(str(x))
 
 
-def build() -> str:
+# The four systems, with names that say what they do (D-030).
+SYSTEMS = [
+    {"key": "trend", "name": "Trend Follower", "color": "s1",
+     "what": "Fixed rules: holds what has been rising, steps aside from what is falling. Rebalances weekly."},
+    {"key": "guard", "name": "Trend Follower + News Guard", "color": "s2",
+     "what": "The same rules, plus an AI that reads the news weekly and can only make it more careful."},
+    {"key": "ai", "name": "News-Driven AI", "color": "s3",
+     "what": "An AI that reads the news and price trends every night and decides what to hold."},
+    {"key": "hold", "name": "Buy & Hold", "color": "s4",
+     "what": "Buy once, never trade. The benchmark every system has to beat to be worth the effort."},
+]
+MARKETS = {
+    "etf": {"title": "US ETFs", "arms": {"trend": "etf_trend", "guard": "etf_trend_ai", "ai": "etf_ai_trader",
+                                          "hold": "etf_bench_spy", "hold2": "etf_bench_60_40"},
+            "hold_names": {"etf_bench_spy": "Buy & Hold: S&P 500", "etf_bench_60_40": "Buy & Hold: 60/40 stocks/bonds"}},
+    "crypto": {"title": "Crypto", "arms": {"trend": "crypto_trend", "guard": "crypto_trend_ai", "ai": "crypto_ai_trader",
+                                            "hold": "crypto_bench_btc", "hold2": "crypto_bench_btc_eth_50_50"},
+               "hold_names": {"crypto_bench_btc": "Buy & Hold: Bitcoin",
+                              "crypto_bench_btc_eth_50_50": "Buy & Hold: 50/50 Bitcoin/Ether"}},
+}
+SYS_NAME = {s["key"]: s["name"] for s in SYSTEMS}
+
+
+def _arm_meta(arm: str) -> tuple[str, str, str]:
+    """(market, system key, display name)."""
+    for mk, m in MARKETS.items():
+        for sk, a in m["arms"].items():
+            if a == arm:
+                key = "hold" if sk.startswith("hold") else sk
+                return mk, key, m["hold_names"].get(arm, SYS_NAME[key])
+    return "", "", arm
+
+
+def _stats(eq: list, ppy: int) -> dict:
+    import math
+    vals = [v for _, v in eq]
+    if not vals:
+        return {}
+    peak, mdd = vals[0], 0.0
+    for v in vals:
+        peak = max(peak, v)
+        mdd = min(mdd, v / peak - 1)
+    rets = [vals[i] / vals[i - 1] - 1 for i in range(1, len(vals)) if vals[i - 1]]
+    vol = sharpe = None
+    if len(rets) > 2:
+        mu = sum(rets) / len(rets)
+        sd = math.sqrt(sum((r - mu) ** 2 for r in rets) / (len(rets) - 1))
+        vol = sd * math.sqrt(ppy)
+        sharpe = mu / sd * math.sqrt(ppy) if sd > 0 else None
+    wk = 5 if ppy == 252 else 7
+    week = vals[-1] / vals[-1 - wk] - 1 if len(vals) > wk else vals[-1] / 5000 - 1
+    return {"value": vals[-1], "ret": vals[-1] / 5000 - 1, "week": week, "mdd": mdd, "vol": vol, "sharpe": sharpe}
+
+
+def _headline(ports: dict) -> str:
+    parts = []
+    for mk, m in MARKETS.items():
+        live = {a: p for a, p in ports.items() if p["market"] == mk and p.get("ret") is not None}
+        if not live:
+            continue
+        lead = max(live.values(), key=lambda p: p["ret"])
+        hold = live.get(m["arms"]["hold"])
+        txt = f"In {m['title']}, {lead['name']} leads ({lead['ret']:+.1%} since the start)"
+        if hold and hold is not lead:
+            txt += f"; {hold['name']} is at {hold['ret']:+.1%}"
+        parts.append(txt + ".")
+    if not parts:
+        return "No trading days completed yet. Every portfolio starts with US$5,000 in cash; the first trades happen after the first nightly run."
+    return " ".join(parts) + " Over days and weeks this is mostly luck: see “Better than luck?”."
+
+
+def _feed(d: dict) -> list[dict]:
+    items = []
+    for x in d["decisions"]:
+        arm = x["arm"]
+        if "_bench" in arm:
+            continue
+        mk, sk, name = _arm_meta(arm)
+        meta = x.get("overlay_meta") or {}
+        tgt = {k: v for k, v in (x.get("target") or {}).items() if v}
+        hold = ", ".join(f"{k} {v:.0%}" for k, v in sorted(tgt.items(), key=lambda kv: -kv[1])) or "all cash"
+        text = f"Target: {hold}."
+        if meta.get("status") == "ok" and meta.get("rationale"):
+            r = meta["rationale"]
+            text += " Reason: “" + (r[:260] + ("…" if len(r) > 260 else "")) + "”"
+        for n in x.get("risk_notes") or []:
+            items.append({"date": x["date"], "market": mk, "system": sk, "who": "Risk manager", "kind": "risk",
+                          "text": f"{name}: {n}"})
+        items.append({"date": x["date"], "market": mk, "system": sk, "who": name, "kind": "decision", "text": text})
+    for e in d["events"]:
+        if e["type"] == "decision_skipped":
+            mk, sk, name = _arm_meta(e["data"]["arm"])
+            items.append({"date": e["data"]["date"], "market": mk, "system": sk, "who": name, "kind": "warn",
+                          "text": "No AI decision today; kept current positions (" + str((e["data"].get("reason") or {}).get("status", "")) + ")."})
+        elif e["type"] == "data_error":
+            items.append({"date": e["ts"][:10], "market": "", "system": "", "who": "System", "kind": "warn",
+                          "text": "Market data problem; no trading that night. It catches up on the next run."})
+    items.sort(key=lambda i: i["date"])
+    return items[-60:]
+
+
+def payload() -> dict:
     d = collect()
-    today = datetime.now(timezone.utc).date()
-    ph, ph_detail = phase(today, d["start"])
+    now = datetime.now(timezone.utc)
+    ph, ph_detail = phase(now.date(), d["start"])
     rel = reliability(d["runs"], d["start"])
-    last_run = next((e["ts"] for e in reversed(d["runs"]) if e["type"] == "run_end"), None)
-
-    # ---- summary table rows
-    rows = []
-    for key, sl in SLEEVES.items():
-        for arm in sl["arms"]:
-            eq = d["series"].get(arm, [])
-            vals = [v for _, v in eq]
-            if vals:
-                peak, mdd = vals[0], 0.0
-                for v in vals:
-                    peak = max(peak, v)
-                    mdd = min(mdd, v / peak - 1)
-                ret = vals[-1] / 5000.0 - 1
-            cost = sum(f.get("cost_usd", 0) for f in d["fills"] if f["arm"] == arm)
-            ntr = sum(1 for f in d["fills"] if f["arm"] == arm)
-            rows.append(
-                f"<tr><td>{_esc(sl['title'])}</td><td>{_esc(LABELS[arm])}</td>"
-                + (f"<td class=num>${vals[-1]:,.2f}</td><td class=num>{ret:+.2%}</td><td class=num>{mdd:.1%}</td>"
-                   if vals else "<td class=num>$5,000.00</td><td class=num>—</td><td class=num>—</td>")
-                + f"<td class=num>{ntr}</td><td class=num>${cost:,.2f}</td></tr>")
-
-    # ---- positions
-    pos_html = []
-    for arm in ("etf_trend", "etf_trend_ai", "etf_ai_trader", "crypto_trend", "crypto_trend_ai", "crypto_ai_trader"):
-        m = d["marks"].get(arm)
-        p = d["positions"].get(arm, {})
-        held = {k: v for k, v in (m or {}).get("weights", {}).items() if abs(v) > 1e-4}
-        tgt = {k: v for k, v in (p.get("pending") or {}).items() if v}
-        assets = sorted(set(held) | set(tgt))
-        body = "".join(f"<tr><td>{_esc(a)}</td><td class=num>{held.get(a, 0):.1%}</td>"
-                       f"<td class=num>{'' if tgt.get(a) is None else f'{tgt[a]:.1%}'}</td></tr>" for a in assets)
-        cash_w = 1 - sum(held.values()) if m else 1.0
-        pos_html.append(
-            f"<div class=card><h3>{_esc(LABELS[arm])} <span class=muted>· {_esc(arm.split('_')[0].upper())}</span></h3>"
-            f"<table><thead><tr><th>Asset</th><th class=num>Held now</th><th class=num>Next target</th></tr></thead>"
-            f"<tbody>{body or '<tr><td colspan=3 class=muted>No positions yet</td></tr>'}"
-            f"<tr><td class=muted>Cash</td><td class=num>{cash_w:.1%}</td><td></td></tr></tbody></table>"
-            f"<p class=muted small>As of {_esc((m or {}).get('date', '—'))}</p></div>")
-
-    # ---- trades
-    trade_rows = "".join(
-        f"<tr><td>{_esc(str(f['date'])[:10])}</td><td>{_esc(LABELS.get(f['arm'], f['arm']))} "
-        f"<span class=muted>({_esc(f['arm'].split('_')[0].upper())})</span></td><td>{_esc(f['asset'])}</td>"
-        f"<td>{'Buy' if f['units'] > 0 else 'Sell'}</td><td class=num>{abs(f['units']):,.6g}</td>"
-        f"<td class=num>${f['price']:,.2f}</td><td class=num>${abs(f['units']) * f['fill_price']:,.2f}</td>"
-        f"<td class=num>${f['cost_usd']:,.2f}</td></tr>"
-        for f in reversed(d["fills"][-200:]))
-
-    # ---- decisions with risk notes
-    dec_rows = "".join(
-        f"<tr><td>{_esc(x['date'])}</td><td>{_esc(LABELS.get(x['arm'], x['arm']))} "
-        f"<span class=muted>({_esc(x['arm'].split('_')[0].upper())})</span></td>"
-        f"<td>{_esc(', '.join(f'{k} {v:.0%}' for k, v in (x.get('target') or {}).items() if v) or 'All cash')}</td>"
-        f"<td>{_esc('; '.join(x.get('risk_notes') or []) or '—')}</td>"
-        f"<td>{_esc((x.get('overlay_meta') or {}).get('status', '—')) if x['arm'].endswith('_ai') else ''}</td></tr>"
-        for x in list(reversed([y for y in d["decisions"] if "_bench" not in y["arm"]]))[:60])
-
-    # ---- holdout verdicts
-    ho_html = ""
-    if d["holdout"]:
-        for name, s in sorted(d["holdout"]["sleeves"].items(), key=lambda kv: kv[0] != "etf_trend"):
-            items = "".join(
-                f"<li><span class='badge {'ok' if v['met'] else 'no'}'>{'✓ Met' if v['met'] else '✗ Not met'}</span> "
-                f"{_esc(k)} <span class=muted>{_esc(v['detail'])}</span></li>"
-                for k, v in s["verdict"].items())
-            ho_html += f"<div class=card><h3>{'ETF sleeve' if name.startswith('etf') else 'Crypto sleeve'}</h3><ul class=verdicts>{items}</ul></div>"
-
     try:
         from . import analysis
         an = analysis.build(LEDGER, STATE_DIR, d["start"])
-    except Exception as exc:  # report-only: never let it break the dashboard
-        an = {"shadow": {}, "random": {}, "error": f"{type(exc).__name__}: {exc}"}
-    luck_html = ""
+    except Exception as exc:
+        an = {"shadow": {}, "random": {}, "costs": {}, "error": f"{type(exc).__name__}: {exc}"}
+    luck = {}
     for sleeve, rb in an.get("random", {}).items():
-        pct = rb["pct"]
-        rows_ = "".join(
-            f"<tr><td>{_esc(LABELS.get(a, 'AI trader: pure AI choices (shadow)' if a.endswith('_pure') else a))}</td>"
-            f"<td class=num>{v['return']:+.2%}</td><td class=num>{v['beats_pct_of_random']:.0f}%</td></tr>"
-            for a, v in sorted(rb["ranks"].items(), key=lambda kv: -kv[1]["beats_pct_of_random"]))
-        luck_html += (f"<div class=card><h3>{'ETF sleeve' if sleeve.startswith('etf') else 'Crypto sleeve'}</h3>"
-                      f"<p class='muted small'>{rb['n']:,} random portfolios since {_esc(rb['start'])}: middle 90% "
-                      f"returned {pct['5']:+.1%} to {pct['95']:+.1%} (median {pct['50']:+.1%}).</p>"
-                      f"<table><thead><tr><th>Portfolio</th><th class=num>Return</th>"
-                      f"<th class=num>Beat this % of random</th></tr></thead><tbody>{rows_}</tbody></table></div>")
-    if an.get("error"):
-        luck_html += f"<p class=muted>Comparison unavailable: {_esc(an['error'])}</p>"
+        for arm, v in rb["ranks"].items():
+            luck[arm] = v["beats_pct_of_random"]
+    ports = {}
+    for mk, m in MARKETS.items():
+        ppy = 252 if mk == "etf" else 365
+        for sk, arm in m["arms"].items():
+            _, key, name = _arm_meta(arm)
+            eq = d["series"].get(arm, [])
+            mark = d["marks"].get(arm, {})
+            hold = {k: v for k, v in mark.get("weights", {}).items() if v > 0.0005}
+            ports[arm] = {"id": arm, "market": mk, "system": key, "name": name, "secondary": sk == "hold2",
+                          "series": eq[-400:], **_stats(eq, ppy),
+                          "holdings": hold, "cash": max(0.0, 1 - sum(hold.values())) if mark else 1.0,
+                          "target": d["positions"].get(arm, {}).get("pending"),
+                          "trades": sum(1 for f in d["fills"] if f["arm"] == arm),
+                          "costs": sum(f["cost_usd"] for f in d["fills"] if f["arm"] == arm),
+                          "luck": luck.get(arm)}
+    ai_month = sum(e["data"].get("cost_usd", 0) for e in d["events"]
+                   if e["type"] == "ai_call" and e["ts"][:7] == now.strftime("%Y-%m"))
+    last_run = next((e["ts"] for e in reversed(d["runs"]) if e["type"] == "run_end"), None)
+    holdout = None
+    if d["holdout"]:
+        holdout = {k: {"verdict": v["verdict"], "table": v["table"]} for k, v in d["holdout"]["sleeves"].items()}
+    return {
+        "generated": now.strftime("%Y-%m-%d %H:%M"), "phase": ph, "phase_detail": ph_detail, "start": d["start"],
+        "headline": _headline(ports), "systems": SYSTEMS,
+        "markets": {k: {"title": v["title"], "arms": v["arms"]} for k, v in MARKETS.items()},
+        "portfolios": ports, "shadow": an.get("shadow", {}), "random": an.get("random", {}),
+        "costs": an.get("costs", {}), "feed": _feed(d), "holdout": holdout,
+        "health": {"last_run": last_run, "completed": rel["completed"], "expected": rel["expected"],
+                   "missed": rel["missed"][-10:], "errors": rel["errors"], "ledger_ok": d["chain_ok"],
+                   "ledger_msg": d["chain_msg"], "ai_month": ai_month, "ai_cap": 50},
+        "links": {"repo": REPO_URL, "ask": "https://claude.ai/artifact/FndLCFizNc6Y7xAzXkJ4Z2"},
+    }
 
-    cost_html = ""
-    for arm, sc in an.get("costs", {}).items():
-        cells = "".join(f"<tr><td>{_esc(k)}</td><td class=num>{v:+.2%}</td></tr>" for k, v in sc.items())
-        cost_html += (f"<div class=card><h3>{_esc(LABELS.get(arm, arm))} <span class=muted>· "
-                      f"{_esc(arm.split('_')[0].upper())}</span></h3><table><thead><tr><th>Trading cost per trade</th>"
-                      f"<th class=num>Return, same decisions</th></tr></thead><tbody>{cells}</tbody></table></div>")
 
-    rel_ok = rel["expected"] == 0 or (rel["completed"] / rel["expected"] >= 0.99)
-    chart_data = {k: {"title": v["title"], "series": [
-        {"id": a, "label": LABELS[a], "points": d["series"].get(a, [])} for a in v["arms"]]
-        + [{"id": f"{k}_ai_trader_pure", "label": "AI trader, pure AI choices (shadow)",
-            "points": an.get("shadow", {}).get(f"{k}_ai_trader", [])}]}
-        for k, v in SLEEVES.items()}
-
-    page = TEMPLATE
-    for k, v in {
-        "{{GENERATED}}": f"{datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC",
-        "{{PHASE}}": _esc(ph), "{{PHASE_DETAIL}}": _esc(ph_detail),
-        "{{LAST_RUN}}": _esc(last_run[:16].replace("T", " ") + " UTC" if last_run else "No runs yet"),
-        "{{RUNS}}": f"{rel['completed']} of {rel['expected']}",
-        "{{RUNS_CLASS}}": "ok" if rel_ok else "no",
-        "{{MISSED}}": _esc(", ".join(rel["missed"][-10:]) or "none"),
-        "{{DATA_ERRORS}}": str(rel["errors"]),
-        "{{CHAIN}}": ("✓ " if d["chain_ok"] else "✗ ") + _esc(d["chain_msg"]),
-        "{{CHAIN_CLASS}}": "ok" if d["chain_ok"] else "no",
-        "{{SUMMARY_ROWS}}": "".join(rows),
-        "{{POSITIONS}}": "".join(pos_html),
-        "{{TRADES}}": trade_rows or "<tr><td colspan=8 class=muted>No trades yet. The first fills happen at the "
-                                    "open after the first decision.</td></tr>",
-        "{{DECISIONS}}": dec_rows or "<tr><td colspan=5 class=muted>No decisions yet.</td></tr>",
-        "{{LUCK}}": luck_html or "<p class=muted>Appears once the forward test has a few days of data.</p>",
-        "{{COSTS}}": cost_html or "<p class=muted>Appears after the first trades.</p>",
-        "{{HOLDOUT}}": ho_html or "<p class=muted>Not yet evaluated.</p>",
-        "{{START}}": _esc(d["start"] or "not set"),
-        "{{REPO}}": REPO_URL,
-        "{{DATA}}": json.dumps(chart_data).replace("</", "<\\/"),
-    }.items():
-        page = page.replace(k, v)
+def build() -> str:
+    data = payload()
+    page = (Path(__file__).parent / "dashboard.html").read_text()
+    page = page.replace("{{DATA}}", json.dumps(data, default=str).replace("</", "<\\/"))
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(page)
     return str(OUT)
 
-
-TEMPLATE = r"""<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AI Trading Lab</title>
-<meta name="description" content="Live dashboard for a pre-registered paper-trading experiment. Simulated money only.">
-<style>
-:root{color-scheme:light;--bg:#f7f7f5;--surface:#fcfcfb;--border:#e4e3df;--text:#0b0b0b;--text2:#52514e;--muted:#7a7974;
---s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--grid:#ecebe7;--good:#006300;--goodbg:#e3f3e3;--bad:#b02a2a;--badbg:#fbe6e6}
-@media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){color-scheme:dark;--bg:#111110;--surface:#1a1a19;--border:#2e2e2b;
---text:#f0efec;--text2:#c3c2b7;--muted:#8f8e86;--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--grid:#262624;--good:#5fd35f;--goodbg:#173017;--bad:#ff8a8a;--badbg:#3a1a1a}}
-:root[data-theme="dark"]{color-scheme:dark;--bg:#111110;--surface:#1a1a19;--border:#2e2e2b;--text:#f0efec;--text2:#c3c2b7;--muted:#8f8e86;
---s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--grid:#262624;--good:#5fd35f;--goodbg:#173017;--bad:#ff8a8a;--badbg:#3a1a1a}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
-main{max-width:1100px;margin:0 auto;padding:24px 16px 64px}h1{font-size:26px;margin:0 0 4px}h2{font-size:19px;margin:36px 0 12px}
-h3{font-size:15px;margin:0 0 10px}.muted{color:var(--muted)}.small{font-size:13px}p{margin:6px 0}
-.banner{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin:16px 0;color:var(--text2)}
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;min-width:0}
-.tile .k{font-size:13px;color:var(--text2)}.tile .v{font-size:20px;font-weight:600;margin-top:2px}
-.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
-.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}
-th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);white-space:nowrap}th{color:var(--text2);font-weight:600}
-.num{text-align:right;font-variant-numeric:tabular-nums}
-.card{overflow-x:auto}.card td:first-child,.card th:first-child{white-space:normal;min-width:120px}
-.badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600}
-.ok{color:var(--good);background:var(--goodbg)}.no{color:var(--bad);background:var(--badbg)}
-ul.verdicts{list-style:none;padding:0;margin:0}ul.verdicts li{padding:5px 0;border-bottom:1px solid var(--border)}
-.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--text2);margin:4px 0 8px}
-.legend span{display:inline-flex;align-items:center;gap:6px}.legend i{width:14px;height:3px;border-radius:2px;display:inline-block}
-.chart{position:relative}.chart svg{display:block;width:100%;height:auto}
-.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;
-font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.12);display:none;white-space:nowrap;z-index:2}
-.empty{padding:40px 8px;text-align:center;color:var(--muted)}
-.askbtn{display:inline-block;background:var(--s1);color:#fff;text-decoration:none;font-weight:600;padding:8px 14px;border-radius:8px;margin-right:6px}
-.askbtn:focus-visible{outline:2px solid var(--text);outline-offset:2px}
-details summary{cursor:pointer;color:var(--text2)}footer{margin-top:40px;font-size:13px;color:var(--muted)}a{color:var(--s1)}
-</style></head><body><main>
-<h1>AI Trading Lab</h1>
-<p class=muted>Pre-registered paper-trading experiment · <strong>simulated money only</strong> · updated {{GENERATED}}</p>
-<p><a class=askbtn href="https://claude.ai/artifact/FndLCFizNc6Y7xAzXkJ4Z2" target="_blank" rel="noopener">Ask a question about this experiment</a> <span class="muted small">Opens the owner's private Q&amp;A page in Claude; sign in to claude.ai first.</span></p>
-<div class=banner><strong>{{PHASE}}.</strong> {{PHASE_DETAIL}} Short-term results are dominated by luck: over 90 days a Sharpe ratio is uncertain by about ±2, so judge this test mainly on reliability and on consistency with the backtest.</div>
-
-<div class=tiles>
- <div class="card tile"><div class=k>Last nightly run</div><div class=v>{{LAST_RUN}}</div></div>
- <div class="card tile"><div class=k>Nightly runs completed</div><div class=v><span class="badge {{RUNS_CLASS}}">{{RUNS}}</span></div><div class="muted small">Missed: {{MISSED}} · data errors: {{DATA_ERRORS}}</div></div>
- <div class="card tile"><div class=k>Ledger tamper check</div><div class=v><span class="badge {{CHAIN_CLASS}}">{{CHAIN}}</span></div></div>
- <div class="card tile"><div class=k>Forward test start</div><div class=v>{{START}}</div><div class="muted small">US$5,000 per portfolio</div></div>
-</div>
-
-<details class=card style="margin-top:16px"><summary><strong>New to this? How to read this page</strong></summary>
-<div class=small style="margin-top:10px">
-<p><strong>What's being tested.</strong> Ten pretend portfolios, each starting with US$5,000, run by different methods on the same markets. Nothing here uses real money.</p>
-<ul>
-<li><strong>Trend strategy:</strong> fixed rules. Hold assets whose prices have been rising over the past 1–12 months, sized so the portfolio's swings stay moderate. Checked weekly.</li>
-<li><strong>Trend + AI overlay:</strong> the same, but once a week an AI reads the news and may <em>reduce</em> positions if it sees a specific danger.</li>
-<li><strong>AI trader:</strong> every day an AI reads current news and price trends and decides what to hold, within the same limits.</li>
-<li><strong>Benchmarks:</strong> what a passive investor would get by simply buying and holding (S&amp;P 500, a 60/40 stocks/bonds mix, Bitcoin, BTC/ETH). Any strategy has to beat these to be worth the effort.</li>
-</ul>
-<p><strong>Key terms</strong></p>
-<ul>
-<li><strong>Return:</strong> gain or loss since the start. +10% means $5,000 became $5,500.</li>
-<li><strong>Worst drop (drawdown):</strong> the biggest fall from a high point. A 20% drawdown means at some point the portfolio was 20% below its best value. Smaller is better; big drops are hard to recover from (a 50% loss needs a 100% gain to get back).</li>
-<li><strong>Volatility:</strong> how much the value swings day to day. Higher means a bumpier ride.</li>
-<li><strong>Sharpe ratio:</strong> return per unit of risk. Around 0.5 is typical for stocks over the long run; 1 is very good; anything above 2 over a short period is almost certainly luck.</li>
-<li><strong>Costs:</strong> trading fees and price slippage we deliberately charge on every trade, set pessimistically.</li>
-<li><strong>Shakedown / scored window:</strong> the first weeks only check that everything works. Results count from 14 December for 90 days.</li>
-</ul>
-<p><strong>How to judge it.</strong> Over weeks, results are mostly luck, so look at three things: does it run reliably, are the drops smaller than the benchmarks', and does it sit near the top of the "Better than luck?" ranking (95%+)? A good outcome isn't spectacular profit. It's similar or better returns than buying and holding, with smaller crashes, after costs.</p>
-<p><strong>Example.</strong> If Bitcoin falls 20% and the crypto trend strategy only falls 8%, that's the strategy doing its job: it was partly in cash because the trend had turned down.</p>
-</div></details>
-
-<h2>Portfolio value</h2>
-<p class="muted small">Each portfolio started with US$5,000 (dotted line). The "Trend + AI overlay" portfolios behave identically to the plain trend portfolios until the AI overlay is switched on; that period is excluded from the AI comparison.</p>
-<div class=grid2 id=charts></div>
-
-<h2>Better than luck?</h2>
-<p class="muted small">Each portfolio ranked against 1,000 "random guessers" that pick random weights on the same assets every week, with the same costs and limits. Beating 50% is what luck alone gives on average; a result has to sit near the top (95%+) to suggest skill, and even then 90 days is a short test.</p>
-<div class=grid2>{{LUCK}}</div>
-
-<h2>What would cheaper trading change?</h2>
-<p class="muted small">The same decisions re-priced at lower trading costs (report only; the portfolios themselves always pay the pessimistic modelled cost). The gap between rows is money lost to fees rather than to bad decisions.</p>
-<div class=grid2>{{COSTS}}</div>
-
-<h2>Summary</h2>
-<div class="card scroll"><table><thead><tr><th>Sleeve</th><th>Portfolio</th><th class=num>Value</th><th class=num>Return</th><th class=num>Worst drop</th><th class=num>Trades</th><th class=num>Costs paid</th></tr></thead>
-<tbody>{{SUMMARY_ROWS}}</tbody></table></div>
-
-<h2>Current positions</h2>
-<div class=grid2>{{POSITIONS}}</div>
-
-<h2>Recent decisions</h2>
-<p class="muted small">Decisions are made after the close and filled at the next open. Risk-manager actions appear in the notes column.</p>
-<div class="card scroll"><table><thead><tr><th>Date</th><th>Portfolio</th><th>Target</th><th>Risk notes</th><th>AI overlay</th></tr></thead><tbody>{{DECISIONS}}</tbody></table></div>
-
-<h2>Trades</h2>
-<div class="card scroll"><table><thead><tr><th>Date</th><th>Portfolio</th><th>Asset</th><th>Side</th><th class=num>Units</th><th class=num>Market price</th><th class=num>Amount</th><th class=num>Cost</th></tr></thead><tbody>{{TRADES}}</tbody></table></div>
-
-<h2>Locked holdout test (one-time, Nov 2023 – Nov 2026)</h2>
-<div class=grid2>{{HOLDOUT}}</div>
-
-<footer>Source, plan and full audit trail: <a href="{{REPO}}">{{REPO}}</a> ·
-<a href="{{REPO}}/blob/main/docs/PREREGISTRATION.md">Pre-registered plan</a> ·
-<a href="{{REPO}}/blob/main/docs/DECISIONS.md">Decisions log</a> ·
-<a href="{{REPO}}/blob/main/reports/holdout.md">Holdout report</a></footer>
-</main>
-<script>
-const DATA={{DATA}};
-const COLORS=["--s1","--s2","--s3","--s4","--s5","--s5"], DASH=["", "6 4", "", "", "", "2 3"];
-const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-const fmt=v=>"$"+v.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
-function draw(){
- const host=document.getElementById("charts"); host.innerHTML="";
- for(const key of Object.keys(DATA)){
-  const sl=DATA[key], card=document.createElement("div"); card.className="card";
-  card.innerHTML=`<h3>${sl.title}</h3><div class=legend>${sl.series.map((s,i)=>`<span><i style="background:var(${COLORS[i]});${DASH[i]?'background:repeating-linear-gradient(90deg,var('+COLORS[i]+') 0 '+(i==1?5:2)+'px,transparent '+(i==1?5:2)+'px '+(i==1?8:5)+'px)':''}"></i>${s.label}</span>`).join("")}</div>`;
-  const box=document.createElement("div"); box.className="chart"; card.appendChild(box); host.appendChild(card);
-  const all=sl.series.flatMap(s=>s.points);
-  if(all.length<2){box.innerHTML=`<div class=empty>No forward data yet: the chart fills in after the first nightly runs.</div>`;continue;}
-  const W=520,H=260,L=64,R=12,T=10,B=28;
-  const dates=[...new Set(all.map(p=>p[0]))].sort(), x0=Date.parse(dates[0]), x1=Date.parse(dates[dates.length-1])||x0+1;
-  let lo=Math.min(...all.map(p=>p[1])), hi=Math.max(...all.map(p=>p[1])); const pad=(hi-lo)*0.08||50; lo-=pad; hi+=pad;
-  const X=t=>L+(W-L-R)*((Date.parse(t)-x0)/((x1-x0)||1)), Y=v=>T+(H-T-B)*(1-(v-lo)/(hi-lo));
-  let g=""; for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4,y=Y(v);g+=`<line x1=${L} x2=${W-R} y1=${y} y2=${y} stroke="${css('--grid')}"/><text x=${L-6} y=${y+4} text-anchor=end font-size=11 fill="${css('--muted')}">${"$"+Math.round(v).toLocaleString()}</text>`;}
-  const ticks=[dates[0],dates[Math.floor(dates.length/2)],dates[dates.length-1]];
-  ticks.forEach((t,i)=>g+=`<text x=${X(t)} y=${H-8} font-size=11 text-anchor=${["start","middle","end"][i]} fill="${css('--muted')}">${t}</text>`);
-  g+=`<line x1=${L} x2=${W-R} y1=${Y(5000)} y2=${Y(5000)} stroke="${css('--muted')}" stroke-dasharray="2 3" opacity="0.6"/>`;
-  const lines=sl.series.map((s,i)=>s.points.length?`<path fill=none stroke="${css(COLORS[i])}" stroke-width=2 stroke-linejoin=round stroke-linecap=round ${DASH[i]?`stroke-dasharray="${DASH[i]}"`:""} d="${s.points.map((p,j)=>(j?"L":"M")+X(p[0]).toFixed(1)+" "+Y(p[1]).toFixed(1)).join(" ")}"/>`:"").join("");
-  box.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role=img aria-label="${sl.title} portfolio values">${g}${lines}<line class=xh y1=${T} y2=${H-B} stroke="${css('--muted')}" visibility=hidden/><rect x=${L} y=${T} width=${W-L-R} height=${H-T-B} fill=transparent /></svg><div class=tip></div>`;
-  const svg=box.querySelector("svg"), tip=box.querySelector(".tip"), xh=box.querySelector(".xh");
-  svg.addEventListener("pointermove",e=>{const r=svg.getBoundingClientRect(), px=(e.clientX-r.left)*W/r.width;
-   let best=dates[0],bd=1e9; for(const t of dates){const dd=Math.abs(X(t)-px); if(dd<bd){bd=dd;best=t;}}
-   xh.setAttribute("x1",X(best));xh.setAttribute("x2",X(best));xh.setAttribute("visibility","visible");
-   tip.innerHTML=`<strong>${best}</strong><br>`+sl.series.map((s,i)=>{const p=s.points.find(q=>q[0]==best);return p?`<span style="color:var(${COLORS[i]})">■</span> ${s.label}: ${fmt(p[1])}`:"";}).filter(Boolean).join("<br>");
-   tip.style.display="block"; const tx=X(best)*r.width/W; tip.style.left=Math.min(Math.max(tx+12,0),r.width-tip.offsetWidth)+"px"; tip.style.top="8px";});
-  svg.addEventListener("pointerleave",()=>{tip.style.display="none";xh.setAttribute("visibility","hidden");});
- }
-}
-draw(); matchMedia("(prefers-color-scheme: dark)").addEventListener("change",draw);
-</script></body></html>
-"""
 
 if __name__ == "__main__":
     print(build())

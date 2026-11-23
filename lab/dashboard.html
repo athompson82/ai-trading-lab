@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Trading Lab</title>
+<meta name="description" content="Live dashboard for a pre-registered paper-trading experiment. Simulated money only.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<style>
+/* Layout: one centred column; summary first (headline, system cards), then comparison (chart, table, bars), then detail (holdings, feed, costs, records). */
+:root{color-scheme:light;
+--bg:#f7f8f7;--surface:#ffffff;--surface-2:#f2f4f3;--line:#e4e8e6;--text:#16201d;--text-2:#46524e;--muted:#6f7a76;
+--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#c98500;--s1t:#e6f0fb;--s2t:#fdece4;--s3t:#e2f6ee;--s4t:#fbf1dc;
+--good:#0f7b3e;--bad:#c0392b;--goodbg:#e2f4e8;--badbg:#fbe7e4;--warn:#9a6200;--warnbg:#fdf2dc;--grid:#eceeed;
+--font:Manrope,system-ui,-apple-system,"Segoe UI",sans-serif}
+@media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){color-scheme:dark;
+--bg:#0f1312;--surface:#171c1b;--surface-2:#1e2422;--line:#2a312f;--text:#eef1ef;--text-2:#c0c8c4;--muted:#8c9893;
+--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s1t:#16253a;--s2t:#33201a;--s3t:#12291f;--s4t:#2e2410;
+--good:#5fd38d;--bad:#ff8a7e;--goodbg:#15301f;--badbg:#3a1c19;--warn:#f0b45a;--warnbg:#33270f;--grid:#232a28}}
+:root[data-theme="dark"]{color-scheme:dark;
+--bg:#0f1312;--surface:#171c1b;--surface-2:#1e2422;--line:#2a312f;--text:#eef1ef;--text-2:#c0c8c4;--muted:#8c9893;
+--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s1t:#16253a;--s2t:#33201a;--s3t:#12291f;--s4t:#2e2410;
+--good:#5fd38d;--bad:#ff8a7e;--goodbg:#15301f;--badbg:#3a1c19;--warn:#f0b45a;--warnbg:#33270f;--grid:#232a28}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 var(--font)}
+main{max-width:1180px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:22px}
+h1{margin:0;font-size:30px;font-weight:800;letter-spacing:-.01em}
+h2{margin:0;font-size:19px;font-weight:700}
+h3{margin:0;font-size:16px;font-weight:700}
+p{margin:0}
+.muted{color:var(--muted)}.small{font-size:13px}
+.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:14px}
+.eyebrow{font-size:12.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.pills{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 13px;font-size:13.5px;font-weight:600;color:var(--text-2);text-decoration:none}
+.pill .dot{width:8px;height:8px;border-radius:50%}
+.btn{background:var(--text);color:var(--bg);border-color:var(--text)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;min-width:0}
+.headline{display:flex;gap:14px;align-items:flex-start}
+.headline .lead{font-size:18px;line-height:1.5;font-weight:500}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:980px){.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.grid4,.grid2{grid-template-columns:minmax(0,1fr)}}
+.sys{display:flex;flex-direction:column;gap:10px;border-top:4px solid var(--c)}
+.sys .icon{width:44px;height:44px;border-radius:12px;background:var(--ct);color:var(--c);display:flex;align-items:center;justify-content:center;flex:none}
+.sys .what{font-size:13.5px;color:var(--text-2);line-height:1.45}
+.mrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;align-items:center;padding-top:8px;border-top:1px solid var(--line)}
+.mrow .lbl{font-size:12.5px;color:var(--muted);font-weight:600}
+.big{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.pos{color:var(--good)}.neg{color:var(--bad)}
+.chip{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700;background:var(--surface-2);color:var(--text-2);white-space:nowrap}
+.tabs{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--surface)}
+.tabs button{border:0;background:transparent;color:var(--text-2);font:inherit;font-weight:700;font-size:14px;padding:7px 16px;border-radius:999px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--text);color:var(--bg)}
+button:focus-visible,a:focus-visible,summary:focus-visible,th button:focus-visible{outline:2px solid var(--s1);outline-offset:2px}
+.sechead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--text-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}.legend i{width:16px;height:3px;border-radius:2px;display:inline-block}
+.chart{position:relative}.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 11px;font-size:13px;box-shadow:0 6px 18px rgba(0,0,0,.12);display:none;white-space:nowrap;z-index:3}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+th button{all:unset;cursor:pointer}th button::after{content:" ↕";opacity:.4}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:8px;vertical-align:middle}
+.bars{display:flex;flex-direction:column;gap:9px}
+.bar{display:grid;grid-template-columns:minmax(0,190px) minmax(0,1fr) 56px;gap:10px;align-items:center;font-size:13.5px}
+.bar .track{position:relative;height:16px;background:var(--surface-2);border-radius:5px}
+.bar .fill{position:absolute;top:0;bottom:0;left:0;border-radius:5px}
+.bar .mark{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--muted);opacity:.6}
+.bar .v{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+.alloc{display:flex;height:14px;border-radius:5px;overflow:hidden;background:var(--surface-2);gap:2px}
+.feed{display:flex;flex-direction:column}
+.ev{display:grid;grid-template-columns:86px 28px minmax(0,1fr);gap:10px;padding:11px 0;border-bottom:1px solid var(--line);font-size:14px;line-height:1.45}
+.ev:last-child{border-bottom:0}
+.ev .d{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.ev .k{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center}
+details>summary{cursor:pointer;font-weight:700;list-style:none}details>summary::-webkit-details-marker{display:none}
+details>summary::before{content:"▸ ";color:var(--muted)}details[open]>summary::before{content:"▾ "}
+.verdicts{list-style:none;margin:10px 0 0;padding:0}.verdicts li{padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
+.ok{background:var(--goodbg);color:var(--good)}.no{background:var(--badbg);color:var(--bad)}.wn{background:var(--warnbg);color:var(--warn)}
+#healthTable td,#costs th,#costs td{white-space:normal}#healthTable td.num{text-align:right}
+.empty{padding:36px 8px;text-align:center;color:var(--muted)}
+footer{font-size:13px;color:var(--muted)}footer a{color:var(--text-2)}
+@media (prefers-reduced-motion:no-preference){.card{transition:border-color .15s}}
+</style></head><body><main>
+
+<header class="top">
+  <div>
+    <div class="eyebrow" id="eyebrow"></div>
+    <h1>AI Trading Lab</h1>
+    <p class="muted">Four ways of investing US$5,000 of pretend money, compared live. Simulated money only.</p>
+  </div>
+  <div class="pills">
+    <a class="pill" href="#health" id="healthPill"><span class="dot"></span><span></span></a>
+    <a class="pill btn" id="askLink" target="_blank" rel="noopener">Ask a question</a>
+  </div>
+</header>
+
+<section class="card headline" aria-label="Today in plain English">
+  <div class="sys" style="border:0;padding:0"><div class="icon" style="--c:var(--text-2);--ct:var(--surface-2)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"/></svg></div></div>
+  <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+    <span class="eyebrow">Today in plain English</span>
+    <p class="lead" id="headline"></p>
+    <p class="small muted" id="phaseDetail"></p>
+  </div>
+</section>
+
+<section aria-label="The four systems" class="grid4" id="systems"></section>
+
+<section class="card" style="display:flex;flex-direction:column;gap:16px">
+  <div class="sechead">
+    <h2>Compare</h2>
+    <div class="tabs" role="tablist" id="mtabs"></div>
+  </div>
+  <div class="legend" id="legend"></div>
+  <div class="chart" id="chart"></div>
+  <div class="scroll"><table id="table"></table></div>
+  <p class="small muted">Click a column heading to sort. Volatility = how bumpy the ride is (yearly). Sharpe = return per unit of risk; anything above 2 over a few weeks is almost certainly luck.</p>
+</section>
+
+<section class="grid2">
+  <div class="card" style="display:flex;flex-direction:column;gap:12px">
+    <h2>Better than luck?</h2>
+    <p class="small muted">Share of 1,000 random-guessing portfolios each one beat. 50% is what luck alone gives; skill would look like 95% or more, sustained.</p>
+    <div class="bars" id="luckBars"></div>
+  </div>
+  <div class="card" style="display:flex;flex-direction:column;gap:12px">
+    <h2>Worst drop so far</h2>
+    <p class="small muted">Biggest fall from a high point. Smaller is better: a 50% loss needs a 100% gain to recover.</p>
+    <div class="bars" id="ddBars"></div>
+  </div>
+</section>
+
+<section class="card" style="display:flex;flex-direction:column;gap:12px">
+  <h2>What each one holds now</h2>
+  <p class="small muted">Coloured = invested, grey = cash. The largest holdings are listed beside each bar.</p>
+  <div class="bars" id="holdings"></div>
+</section>
+
+<section class="card" style="display:flex;flex-direction:column;gap:6px">
+  <div class="sechead"><h2>What happened</h2><span class="small muted">Latest first · decisions, AI reasoning and risk actions</span></div>
+  <div class="feed" id="feed"></div>
+</section>
+
+<section class="grid2">
+  <div class="card" style="display:flex;flex-direction:column;gap:10px">
+    <h2>What would cheaper trading change?</h2>
+    <p class="small muted">The same decisions re-priced at lower trading costs. The portfolios always pay the pessimistic cost.</p>
+    <div class="scroll" id="costs"></div>
+  </div>
+  <div class="card" id="health" style="display:flex;flex-direction:column;gap:10px">
+    <h2>System health</h2>
+    <div class="scroll"><table id="healthTable"></table></div>
+  </div>
+</section>
+
+<section class="card"><details><summary>Locked three-year test (Nov 2023 – Nov 2026): what history says</summary><div class="grid2" id="holdout" style="margin-top:12px"></div></details></section>
+
+<section class="card"><details><summary>New to this? How to read this page</summary>
+  <div class="small" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;max-width:72ch">
+    <p><strong>The four systems</strong> each get US$5,000 of pretend money in two markets: US ETFs (funds holding stocks, bonds, gold and more) and crypto (Bitcoin and Ether). They use the same costs and safety limits, so differences come from their decisions.</p>
+    <p><strong>Return</strong>: gain or loss since the start. <strong>Worst drop</strong> (drawdown): the biggest fall from a peak. <strong>Volatility</strong>: how much the value swings. <strong>Sharpe</strong>: return per unit of risk, around 0.5 is typical for stocks long-term.</p>
+    <p><strong>How to judge it.</strong> Over weeks, results are mostly luck. Look for: reliable running, smaller drops than Buy &amp; Hold, and a high "Better than luck?" score that holds up. Scoring counts from 14 December for 90 days.</p>
+  </div></details></section>
+
+<footer>Source, plan and full audit trail: <a id="repoLink"></a> · <span id="generated"></span></footer>
+</main>
+<script>
+const DATA={{DATA}};
+(() => {
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s??"").replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+const css=(v)=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const pct=(v,d=1)=>v==null||isNaN(v)?"—":(v>0?"+":"")+(v*100).toFixed(d)+"%";
+const usd=(v)=>v==null?"—":"$"+Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const cls=(v)=>v==null?"":v>0?"pos":v<0?"neg":"";
+const SYS=Object.fromEntries(DATA.systems.map(s=>[s.key,s]));
+const ICONS={
+ trend:'<path d="M3 17l6-6 4 4 7-8"/><path d="M14 7h6v6"/>',
+ guard:'<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M8.5 13.5l2.5-2.5 2 2 3-3.5"/>',
+ ai:'<rect x="4" y="4" width="13" height="16" rx="2"/><path d="M7.5 8.5h6M7.5 12h6M7.5 15.5h3.5"/><path d="M20 6.5v3M18.5 8h3"/>',
+ hold:'<path d="M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9"/>'};
+const icon=(k,s=22)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]||""}</svg>`;
+const P=DATA.portfolios;
+let market="crypto";
+const armsOf=(m)=>Object.values(DATA.markets[m].arms).map(a=>P[a]).filter(Boolean);
+const colorOf=(p)=>`var(--${SYS[p.system].color})`;
+
+// ---------- header
+const h=DATA.health, ok=h.ledger_ok&&(h.expected===0||h.completed/h.expected>=0.99)&&h.errors===0;
+$("eyebrow").textContent=DATA.phase+(DATA.start?" · started "+DATA.start:"");
+$("headline").textContent=DATA.headline;
+$("phaseDetail").textContent=DATA.phase_detail;
+const hp=$("healthPill"); hp.querySelector(".dot").style.background=ok?"var(--good)":"var(--warn)";
+hp.querySelector("span:last-child").textContent=ok?"System healthy":"Needs attention";
+$("askLink").href=DATA.links.ask;
+$("repoLink").href=DATA.links.repo;$("repoLink").textContent=DATA.links.repo.replace("https://","");
+$("generated").textContent="Updated "+DATA.generated+" UTC";
+
+// ---------- system cards
+function spark(series,color){
+  if(!series||series.length<2) return '<span class="small muted">No data yet</span>';
+  const v=series.map(x=>x[1]),lo=Math.min(...v,5000),hi=Math.max(...v,5000),W=120,H=30;
+  const y=(t)=>H-2-(H-4)*((t-lo)/((hi-lo)||1)),x=(i)=>i*(W/(v.length-1));
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true"><line x1="0" x2="${W}" y1="${y(5000)}" y2="${y(5000)}" stroke="${css('--grid')}" stroke-dasharray="2 3"/><path d="${v.map((t,i)=>(i?"L":"M")+x(i).toFixed(1)+" "+y(t).toFixed(1)).join(" ")}" fill="none" stroke="${color}" stroke-width="2"/></svg>`;
+}
+function renderSystems(){
+  $("systems").innerHTML=DATA.systems.map(s=>{
+    const rows=["etf","crypto"].map(m=>{
+      const arms=armsOf(m).filter(p=>p.system===s.key);
+      return arms.map(p=>`<div class="mrow"><span class="lbl">${esc(DATA.markets[m].title)}${s.key==="hold"?" · "+esc(p.name.replace("Buy & Hold: ","")):""}</span><span class="chip" title="Beat this share of 1,000 random portfolios">${p.luck==null?"luck: n/a":"beat "+Math.round(p.luck)+"%"}</span>
+        <span class="big ${cls(p.ret)}">${pct(p.ret)}</span><span>${spark(p.series,css("--"+s.color))}</span></div>`).join("");
+    }).join("");
+    return `<article class="card sys" style="--c:var(--${s.color});--ct:var(--${s.color}t)">
+      <div style="display:flex;gap:12px;align-items:center"><div class="icon">${icon(s.key)}</div><h3>${esc(s.name)}</h3></div>
+      <p class="what">${esc(s.what)}</p>${rows}</article>`;
+  }).join("");
+}
+
+// ---------- tabs
+function renderTabs(){
+  $("mtabs").innerHTML=Object.entries(DATA.markets).map(([k,m])=>`<button role="tab" aria-selected="${k===market}" data-m="${k}">${esc(m.title)}</button>`).join("");
+  $("mtabs").querySelectorAll("button").forEach(b=>b.onclick=()=>{market=b.dataset.m;renderMarket();});
+}
+
+// ---------- chart
+function chartSeries(){
+  const s=armsOf(market).map(p=>({id:p.id,name:p.name,color:css("--"+SYS[p.system].color),dash:p.secondary?"6 4":"",points:p.series||[]}));
+  const sh=DATA.shadow[(market==="etf"?"etf":"crypto")+"_ai_trader"];
+  if(sh&&sh.length>1) s.push({id:"pure",name:"News-Driven AI, its own picks without the safety brake",color:css("--s3"),dash:"2 3",points:sh});
+  return s;
+}
+function renderChart(){
+  const S=chartSeries(), host=$("chart");
+  $("legend").innerHTML=S.map(s=>`<span><i style="background:${s.dash?`repeating-linear-gradient(90deg,${s.color} 0 4px,transparent 4px 7px)`:s.color}"></i>${esc(s.name)}</span>`).join("");
+  const all=S.flatMap(s=>s.points);
+  if(all.length<2){host.innerHTML='<div class="empty">The chart fills in after the first nightly runs.</div>';return;}
+  const W=1060,H=300,L=64,R=150,T=12,B=28;
+  const dates=[...new Set(all.map(p=>p[0]))].sort(), x0=Date.parse(dates[0]), x1=Date.parse(dates[dates.length-1]);
+  let lo=Math.min(5000,...all.map(p=>p[1])), hi=Math.max(5000,...all.map(p=>p[1])); const pad=(hi-lo)*0.08||40; lo-=pad; hi+=pad;
+  const X=(t)=>L+(W-L-R)*((Date.parse(t)-x0)/((x1-x0)||1)), Y=(v)=>T+(H-T-B)*(1-(v-lo)/(hi-lo));
+  let g="";
+  for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4,y=Y(v);g+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="${css('--grid')}"/><text x="${L-8}" y="${y+4}" text-anchor="end" font-size="11" fill="${css('--muted')}">$${Math.round(v).toLocaleString()}</text>`;}
+  [dates[0],dates[Math.floor(dates.length/2)],dates[dates.length-1]].forEach((t,i)=>g+=`<text x="${X(t)}" y="${H-8}" font-size="11" text-anchor="${["start","middle","end"][i]}" fill="${css('--muted')}">${t}</text>`);
+  g+=`<line x1="${L}" x2="${W-R}" y1="${Y(5000)}" y2="${Y(5000)}" stroke="${css('--muted')}" stroke-dasharray="2 4" opacity="0.7"/>`;
+  // direct end labels, nudged apart
+  const ends=S.filter(s=>s.points.length).map(s=>({s,y:Y(s.points[s.points.length-1][1]),v:s.points[s.points.length-1][1]})).sort((a,b)=>a.y-b.y);
+  for(let i=1;i<ends.length;i++) if(ends[i].y-ends[i-1].y<14) ends[i].y=ends[i-1].y+14;
+  const lines=S.map(s=>s.points.length>1?`<path d="${s.points.map((p,i)=>(i?"L":"M")+X(p[0]).toFixed(1)+" "+Y(p[1]).toFixed(1)).join(" ")}" fill="none" stroke="${s.color}" stroke-width="${s.id==="pure"?1.6:2.2}" stroke-linejoin="round" stroke-linecap="round" ${s.dash?`stroke-dasharray="${s.dash}"`:""}/>`:"").join("");
+  const labels=ends.map(e=>`<text x="${W-R+8}" y="${e.y+4}" font-size="11.5" font-weight="700" fill="${css('--text-2')}">${esc((e.s.name.split(",")[0]).replace("Buy & Hold: ","").slice(0,22))} ${((e.v/5000-1)*100).toFixed(1)}%</text>`).join("");
+  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Portfolio values over time">${g}${lines}${labels}<line class="xh" y1="${T}" y2="${H-B}" stroke="${css('--muted')}" visibility="hidden"/><rect x="${L}" y="${T}" width="${W-L-R}" height="${H-T-B}" fill="transparent"/></svg><div class="tip"></div>`;
+  const svg=host.querySelector("svg"),tip=host.querySelector(".tip"),xh=host.querySelector(".xh");
+  svg.addEventListener("pointermove",(e)=>{const r=svg.getBoundingClientRect(),px=(e.clientX-r.left)*W/r.width;
+    let best=dates[0],bd=1e9;for(const t of dates){const d=Math.abs(X(t)-px);if(d<bd){bd=d;best=t;}}
+    xh.setAttribute("x1",X(best));xh.setAttribute("x2",X(best));xh.setAttribute("visibility","visible");
+    tip.innerHTML=`<strong>${esc(best)}</strong><br>`+S.map(s=>{const p=s.points.find(q=>q[0]===best);return p?`<span style="color:${s.color}">■</span> ${esc(s.name.split(",")[0])}: ${usd(p[1])} (${pct(p[1]/5000-1)})`:"";}).filter(Boolean).join("<br>");
+    tip.style.display="block";const tx=X(best)*r.width/W;tip.style.left=Math.max(0,Math.min(tx+12,r.width-tip.offsetWidth))+"px";tip.style.top="6px";});
+  svg.addEventListener("pointerleave",()=>{tip.style.display="none";xh.setAttribute("visibility","hidden");});
+}
+
+// ---------- table
+const COLS=[["name","Portfolio",0],["value","Value",1],["ret","Return",1],["week","This week",1],["mdd","Worst drop",1],["vol","Volatility",1],["sharpe","Sharpe",1],["luck","Beat % random",1],["trades","Trades",1],["costs","Costs paid",1],["cash","Cash now",1]];
+let sortKey="ret",sortDir=-1;
+function renderTable(){
+  const rows=armsOf(market).slice().sort((a,b)=>{const x=a[sortKey],y=b[sortKey];if(x==null)return 1;if(y==null)return -1;return (x>y?1:x<y?-1:0)*sortDir;});
+  const fmt={value:usd,ret:(v)=>`<span class="${cls(v)}">${pct(v)}</span>`,week:(v)=>`<span class="${cls(v)}">${pct(v)}</span>`,mdd:(v)=>pct(v),vol:(v)=>v==null?"—":(v*100).toFixed(0)+"%",
+    sharpe:(v)=>v==null?"—":v.toFixed(2),luck:(v)=>v==null?"—":Math.round(v)+"%",trades:(v)=>v??0,costs:usd,cash:(v)=>v==null?"—":Math.round(v*100)+"%"};
+  $("table").innerHTML=`<thead><tr>${COLS.map(([k,l,n])=>`<th class="${n?"num":""}"><button data-k="${k}" aria-label="Sort by ${l}">${l}</button></th>`).join("")}</tr></thead><tbody>`+
+    rows.map(p=>`<tr><td><span class="sw" style="background:${colorOf(p)}"></span>${esc(p.name)}</td>${COLS.slice(1).map(([k])=>`<td class="num">${fmt[k](p[k])}</td>`).join("")}</tr>`).join("")+"</tbody>";
+  $("table").querySelectorAll("th button").forEach(b=>b.onclick=()=>{const k=b.dataset.k;sortDir=k===sortKey?-sortDir:-1;sortKey=k;renderTable();});
+}
+
+// ---------- bars
+function renderBars(){
+  const arms=armsOf(market);
+  const extra=[];
+  const rb=DATA.random[market==="etf"?"etf_trend":"crypto_trend"];
+  if(rb){const pure=rb.ranks[(market==="etf"?"etf":"crypto")+"_ai_trader_pure"];if(pure)extra.push({name:"News-Driven AI (own picks)",luck:pure.beats_pct_of_random,color:"var(--s3)",dashed:true});
+    Object.entries(rb.ranks).filter(([k])=>k.startsWith("mf_")).forEach(([k,v])=>extra.push({name:"Pro trend fund "+k.slice(3),luck:v.beats_pct_of_random,color:"var(--muted)"}));}
+  const L=[...arms.map(p=>({name:p.name,luck:p.luck,color:colorOf(p)})),...extra];
+  $("luckBars").innerHTML=L.some(x=>x.luck!=null)?L.map(x=>`<div class="bar"><span>${esc(x.name)}</span><div class="track" title="${x.luck==null?"":Math.round(x.luck)+"%"}">${x.luck==null?"":`<div class="fill" style="width:${x.luck}%;background:${x.color};${x.dashed?"opacity:.55":""}"></div>`}<div class="mark" style="left:50%"></div><div class="mark" style="left:95%;background:var(--good);opacity:1"></div></div><span class="v">${x.luck==null?"—":Math.round(x.luck)+"%"}</span></div>`).join("")+`<p class="small muted">Grey line: 50% (luck). Green line: 95% (possible skill).</p>`
+    :'<div class="empty">Appears after a few trading days.</div>';
+  const worst=Math.min(-0.05,...arms.map(p=>p.mdd??0));
+  $("ddBars").innerHTML=arms.some(p=>p.mdd!=null)?arms.map(p=>`<div class="bar"><span>${esc(p.name)}</span><div class="track"><div class="fill" style="width:${p.mdd==null?0:(p.mdd/worst*100)}%;background:${colorOf(p)}"></div></div><span class="v">${p.mdd==null?"—":pct(p.mdd)}</span></div>`).join("")
+    :'<div class="empty">Appears after the first trading days.</div>';
+}
+
+// ---------- holdings
+function renderHoldings(){
+  $("holdings").innerHTML=armsOf(market).map(p=>{
+    const hs=Object.entries(p.holdings||{}).sort((a,b)=>b[1]-a[1]);
+    const segs=hs.map(([a,w])=>`<div title="${esc(a)} ${Math.round(w*100)}%" style="width:${w*100}%;background:${colorOf(p)};opacity:${0.55+0.45*(w/Math.max(...hs.map(h=>h[1])))}"></div>`).join("");
+    const list=hs.slice(0,4).map(([a,w])=>`${esc(a)} ${Math.round(w*100)}%`).join(", ")+(hs.length>4?", …":"");
+    return `<div class="bar" style="grid-template-columns:minmax(0,190px) minmax(0,1fr) minmax(0,260px)"><span>${esc(p.name)}</span><div class="alloc">${segs}</div><span class="small muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${hs.length?list+` · cash ${Math.round((p.cash??0)*100)}%`:"All cash"}</span></div>`;
+  }).join("");
+}
+
+// ---------- feed
+function renderFeed(){
+  const items=DATA.feed.filter(i=>!i.market||i.market===market).slice().reverse().slice(0,14);
+  const kindIcon={decision:(s)=>({c:s?`var(--${SYS[s].color})`:"var(--text-2)",bg:s?`var(--${SYS[s].color}t)`:"var(--surface-2)",i:icon(s||"trend",16)}),
+    risk:()=>({c:"var(--warn)",bg:"var(--warnbg)",i:icon("guard",16)}),warn:()=>({c:"var(--bad)",bg:"var(--badbg)",i:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 8v5M12 16.5v.5"/><circle cx="12" cy="12" r="9"/></svg>'})};
+  $("feed").innerHTML=items.length?items.map(i=>{const k=(kindIcon[i.kind]||kindIcon.decision)(i.system);
+    return `<div class="ev"><span class="d">${esc(i.date)}</span><span class="k" style="color:${k.c};background:${k.bg}">${k.i}</span><span><strong>${esc(i.who)}</strong> · ${esc(i.text)}</span></div>`;}).join("")
+    :'<div class="empty">Nothing yet. The first decisions appear after tonight\'s run.</div>';
+}
+
+// ---------- costs, health, holdout
+function renderCosts(){
+  const rows=Object.entries(DATA.costs).filter(([a])=>a.startsWith(market));
+  if(!rows.length){$("costs").innerHTML='<div class="empty">Appears after the first trades.</div>';return;}
+  const cols=Object.keys(rows[0][1]);
+  $("costs").innerHTML=`<table><thead><tr><th>Portfolio</th>${cols.map(c=>`<th class="num">${esc(c)}</th>`).join("")}</tr></thead><tbody>${rows.map(([a,sc])=>`<tr><td>${esc(P[a]?P[a].name:a)}</td>${cols.map(c=>`<td class="num ${cls(sc[c])}">${pct(sc[c],2)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+}
+function renderHealth(){
+  const row=(k,v,st)=>`<tr><td>${esc(k)}</td><td class="num"><span class="chip ${st}">${esc(v)}</span></td></tr>`;
+  $("healthTable").innerHTML="<tbody>"+row("Last nightly run",h.last_run?h.last_run.slice(0,16).replace("T"," ")+" UTC":"none yet","")+
+    row("Nightly runs completed",`${h.completed} of ${h.expected}`,h.expected===0||h.completed===h.expected?"ok":"wn")+
+    row("Missed runs",h.missed.length?h.missed.length+" (latest "+h.missed[h.missed.length-1]+")":"none",h.missed.length?"wn":"ok")+
+    row("Data errors",String(h.errors),h.errors?"wn":"ok")+
+    row("Ledger tamper check",h.ledger_ok?"passed · "+h.ledger_msg:"FAILED · "+h.ledger_msg,h.ledger_ok?"ok":"no")+
+    row("AI spend this month",`$${h.ai_month.toFixed(2)} of $${h.ai_cap}`,h.ai_month<h.ai_cap*0.8?"ok":"wn")+"</tbody>";
+}
+function renderHoldout(){
+  if(!DATA.holdout){$("holdout").innerHTML='<p class="muted">Not evaluated.</p>';return;}
+  $("holdout").innerHTML=Object.entries(DATA.holdout).sort(([a])=>a.startsWith("etf")?-1:1).map(([k,v])=>`<div><h3>${k.startsWith("etf")?"US ETFs":"Crypto"}: Trend Follower</h3><ul class="verdicts">${Object.entries(v.verdict).map(([q,r])=>`<li><span class="chip ${r.met?"ok":"no"}">${r.met?"Met":"Not met"}</span> ${esc(q)} <span class="muted small">${esc(r.detail)}</span></li>`).join("")}</ul></div>`).join("");
+}
+
+function renderMarket(){renderTabs();renderChart();renderTable();renderBars();renderHoldings();renderFeed();renderCosts();}
+function renderAll(){renderSystems();renderMarket();renderHealth();renderHoldout();}
+renderAll();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",renderAll);
+})();
+</script></body></html>
