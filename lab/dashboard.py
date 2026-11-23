@@ -177,9 +177,31 @@ def build() -> str:
                 for k, v in s["verdict"].items())
             ho_html += f"<div class=card><h3>{'ETF sleeve' if name.startswith('etf') else 'Crypto sleeve'}</h3><ul class=verdicts>{items}</ul></div>"
 
+    try:
+        from . import analysis
+        an = analysis.build(LEDGER, STATE_DIR, d["start"])
+    except Exception as exc:  # report-only: never let it break the dashboard
+        an = {"shadow": {}, "random": {}, "error": f"{type(exc).__name__}: {exc}"}
+    luck_html = ""
+    for sleeve, rb in an.get("random", {}).items():
+        pct = rb["pct"]
+        rows_ = "".join(
+            f"<tr><td>{_esc(LABELS.get(a, 'AI trader: pure AI choices (shadow)' if a.endswith('_pure') else a))}</td>"
+            f"<td class=num>{v['return']:+.2%}</td><td class=num>{v['beats_pct_of_random']:.0f}%</td></tr>"
+            for a, v in sorted(rb["ranks"].items(), key=lambda kv: -kv[1]["beats_pct_of_random"]))
+        luck_html += (f"<div class=card><h3>{'ETF sleeve' if sleeve.startswith('etf') else 'Crypto sleeve'}</h3>"
+                      f"<p class='muted small'>{rb['n']:,} random portfolios since {_esc(rb['start'])}: middle 90% "
+                      f"returned {pct['5']:+.1%} to {pct['95']:+.1%} (median {pct['50']:+.1%}).</p>"
+                      f"<table><thead><tr><th>Portfolio</th><th class=num>Return</th>"
+                      f"<th class=num>Beat this % of random</th></tr></thead><tbody>{rows_}</tbody></table></div>")
+    if an.get("error"):
+        luck_html += f"<p class=muted>Comparison unavailable: {_esc(an['error'])}</p>"
+
     rel_ok = rel["expected"] == 0 or (rel["completed"] / rel["expected"] >= 0.99)
     chart_data = {k: {"title": v["title"], "series": [
-        {"id": a, "label": LABELS[a], "points": d["series"].get(a, [])} for a in v["arms"]]}
+        {"id": a, "label": LABELS[a], "points": d["series"].get(a, [])} for a in v["arms"]]
+        + [{"id": f"{k}_ai_trader_pure", "label": "AI trader, pure AI choices (shadow)",
+            "points": an.get("shadow", {}).get(f"{k}_ai_trader", [])}]}
         for k, v in SLEEVES.items()}
 
     page = TEMPLATE
@@ -198,6 +220,7 @@ def build() -> str:
         "{{TRADES}}": trade_rows or "<tr><td colspan=8 class=muted>No trades yet. The first fills happen at the "
                                     "open after the first decision.</td></tr>",
         "{{DECISIONS}}": dec_rows or "<tr><td colspan=5 class=muted>No decisions yet.</td></tr>",
+        "{{LUCK}}": luck_html or "<p class=muted>Appears once the forward test has a few days of data.</p>",
         "{{HOLDOUT}}": ho_html or "<p class=muted>Not yet evaluated.</p>",
         "{{START}}": _esc(d["start"] or "not set"),
         "{{REPO}}": REPO_URL,
@@ -257,6 +280,10 @@ details summary{cursor:pointer;color:var(--text2)}footer{margin-top:40px;font-si
 <p class="muted small">Each portfolio started with US$5,000 (dotted line). The "Trend + AI overlay" portfolios behave identically to the plain trend portfolios until the AI overlay is switched on; that period is excluded from the AI comparison.</p>
 <div class=grid2 id=charts></div>
 
+<h2>Better than luck?</h2>
+<p class="muted small">Each portfolio ranked against 1,000 "random guessers" that pick random weights on the same assets every week, with the same costs and limits. Beating 50% is what luck alone gives on average; a result has to sit near the top (95%+) to suggest skill, and even then 90 days is a short test.</p>
+<div class=grid2>{{LUCK}}</div>
+
 <h2>Summary</h2>
 <div class="card scroll"><table><thead><tr><th>Sleeve</th><th>Portfolio</th><th class=num>Value</th><th class=num>Return</th><th class=num>Worst drop</th><th class=num>Trades</th><th class=num>Costs paid</th></tr></thead>
 <tbody>{{SUMMARY_ROWS}}</tbody></table></div>
@@ -281,14 +308,14 @@ details summary{cursor:pointer;color:var(--text2)}footer{margin-top:40px;font-si
 </main>
 <script>
 const DATA={{DATA}};
-const COLORS=["--s1","--s2","--s3","--s4","--s5"], DASH=["", "6 4", "", "", ""];
+const COLORS=["--s1","--s2","--s3","--s4","--s5","--s5"], DASH=["", "6 4", "", "", "", "2 3"];
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const fmt=v=>"$"+v.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 function draw(){
  const host=document.getElementById("charts"); host.innerHTML="";
  for(const key of Object.keys(DATA)){
   const sl=DATA[key], card=document.createElement("div"); card.className="card";
-  card.innerHTML=`<h3>${sl.title}</h3><div class=legend>${sl.series.map((s,i)=>`<span><i style="background:var(${COLORS[i]});${i==1?'background:repeating-linear-gradient(90deg,var('+COLORS[i]+') 0 5px,transparent 5px 8px)':''}"></i>${s.label}</span>`).join("")}</div>`;
+  card.innerHTML=`<h3>${sl.title}</h3><div class=legend>${sl.series.map((s,i)=>`<span><i style="background:var(${COLORS[i]});${DASH[i]?'background:repeating-linear-gradient(90deg,var('+COLORS[i]+') 0 '+(i==1?5:2)+'px,transparent '+(i==1?5:2)+'px '+(i==1?8:5)+'px)':''}"></i>${s.label}</span>`).join("")}</div>`;
   const box=document.createElement("div"); box.className="chart"; card.appendChild(box); host.appendChild(card);
   const all=sl.series.flatMap(s=>s.points);
   if(all.length<2){box.innerHTML=`<div class=empty>No forward data yet: the chart fills in after the first nightly runs.</div>`;continue;}

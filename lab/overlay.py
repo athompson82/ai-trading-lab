@@ -85,7 +85,8 @@ def risk_overlay(cfg: SleeveConfig, closes: pd.DataFrame, proposed: dict[str, fl
               "specific, current, verifiable reason. " + DISCLAIMER)
     prompt = (f"The strategy intends to hold these weights from the next market open: "
               f"{ {a: round(w, 3) for a, w in held.items()} }.\n\n{market_brief(closes, cfg, held)}\n\n"
-              f"Search for current news relevant to these holdings (at most {ai.MAX_SEARCHES} searches). "
+              f"Search for current news relevant to these holdings: aim for 4-6 distinct searches and never repeat "
+              "a query (search results come back as JSON; parse them rather than searching again). "
               "For each asset return a multiplier between 0 and 1 (1 = keep as proposed, 0.5 = halve, 0 = exit). "
               "Assets not held should get 1.")
     try:
@@ -112,7 +113,8 @@ def ai_trader(cfg: SleeveConfig, closes: pd.DataFrame, holdings: dict[str, float
               "Your goal is the best risk-adjusted return over months, not today's move. " + DISCLAIMER)
     prompt = (f"Universe: {', '.join(cfg.assets)}.\n\n{market_brief(closes, cfg, holdings)}\n\n"
               f"Search for the most important current news, research and macro developments for these assets "
-              f"(at most {ai.MAX_SEARCHES} searches). Then choose target weights to hold from the next market open.")
+              "(aim for 4-6 distinct searches and never repeat a query; search results come back as JSON, so parse "
+              "them rather than searching again). Then choose target weights to hold from the next market open.")
     try:
         res = ai.decide(system, prompt, _weights_schema(cfg.assets, "weights"), ledger,
                         purpose=f"trader:{cfg.name}", client=client)

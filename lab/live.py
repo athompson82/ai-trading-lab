@@ -194,6 +194,9 @@ def run_arm(arm: Arm, ledger: Ledger, start: str, ai_client=None, now: datetime 
                                        "risk_notes": res.notes, "overlay": ov, "overlay_meta": ai_meta})
             st["pending"] = res.decision
             st["pending_not_before"] = _first_executable_day(cfg, now) if uses_ai else None
+            if st["pending_not_before"]:
+                ledger.append("decision_timing", {"arm": arm.name, "date": str(d.date()),
+                                                  "executes_from": st["pending_not_before"]})
         elif executable:
             st["pending"], st["pending_not_before"] = None, None
         ledger.append("mark", {"arm": arm.name, "date": str(d.date()), "equity": round(res.equity, 4),

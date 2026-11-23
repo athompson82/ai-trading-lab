@@ -19,7 +19,7 @@ better trading decisions than simple rules and passive investing, after costs?
 ## 3. Rules
 
 - **Decision.** Once a day, after the close, Claude (`claude-opus-5-5`, medium
-  effort, up to 5 web searches) receives:
+  effort, web search capped at 10 calls with 4–6 distinct searches requested) receives:
   - the price-trend facts (1-week, 1-month, 3-month and 12-month returns, and volatility),
   - its current weights, and
   - the rules: long or cash only, per-asset caps (30% ETF / 70% crypto), total ≤ 100%, and the cost per trade.
@@ -76,3 +76,22 @@ without a longer test.
 reliable advantage and higher costs from more frequent trading. Claims of
 multiplying money daily are not achievable and are explicitly not a goal
 (D-018).
+
+## 6. Report-only comparisons (added before the first AI decision, owner-approved)
+
+These change nothing about how any portfolio trades. They are computed from
+the ledger and price data by `lab/analysis.py`.
+
+1. **Pure-AI shadow.** The AI trader's raw daily choices, replayed with the
+   same timing and costs and only the hard limits (per-asset caps, no
+   leverage). There is no drawdown brake. This shows the value of the AI's
+   judgement on its own, alongside the real arm (AI inside the safe system).
+2. **Random-guessing baseline.** 1,000 portfolios per sleeve that draw random
+   weights over the same assets plus cash every week (uniform over the
+   simplex, capped per asset). They use the same band and costs, with a fixed
+   random seed (20261123). Every arm, and the pure-AI shadow, is reported with
+   the share of random portfolios its return beat.
+
+   Reading the result:
+   - ≥ 95% is a suggestive sign of skill. Over 90 days it is not proof.
+   - Around 50% is indistinguishable from luck.

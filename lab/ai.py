@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 
 MODEL = "claude-opus-5-5"
 EFFORT = "medium"
-MAX_SEARCHES = 5
+MAX_SEARCHES = 10  # tool cap; prompts ask for 4-6 distinct searches (D-021)
 # US$ per million tokens / per search for MODEL (platform pricing, 2026-11).
 PRICE_IN, PRICE_OUT, PRICE_SEARCH = 4.00, 20.00, 0.01
 # Owner-approved AI cap is $60/month (D-017). Stop at $50 to leave headroom.
