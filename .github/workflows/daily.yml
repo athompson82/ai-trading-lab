@@ -1,0 +1,47 @@
+name: daily-paper-trading
+
+# Runs after the US market close and the UTC crypto day boundary.
+# Does nothing until the repository variable FORWARD_START is set, so the
+# forward test only begins once the pre-registration is signed off.
+on:
+  schedule:
+    - cron: "17 1 * * *"   # 01:17 UTC daily
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: paper-trading
+  cancel-in-progress: false
+
+jobs:
+  run:
+    if: ${{ vars.FORWARD_START != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Verify ledger integrity
+        run: python -m lab.cli verify
+      - name: Daily run (data refresh, fills, marks, decisions)
+        env:
+          TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python -m lab.cli run --start "${{ vars.FORWARD_START }}"
+      - name: Report
+        if: always()
+        run: python -m lab.cli report
+      - name: Commit ledger, state, data and report
+        if: always()
+        run: |
+          git config user.name "paper-trading-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add ledger reports data
+          git diff --cached --quiet || git commit -m "Daily run $(date -u +%Y-%m-%d)"
+          for i in 1 2 3 4; do git push && break; sleep $((i*10)); git pull --rebase; done

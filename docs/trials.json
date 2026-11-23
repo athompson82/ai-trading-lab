@@ -1,0 +1,80 @@
+{
+ "etf_trend": {
+  "trials": [
+   {
+    "trial": "T1 initial: all-time-high drawdown brake, band 2%",
+    "sharpe_annual": 0.5628,
+    "sharpe_per_period": 0.03545247781753346
+   },
+   {
+    "trial": "T2 trailing-12m brake, band 2%",
+    "sharpe_annual": 0.5536,
+    "sharpe_per_period": 0.034872816314737085
+   },
+   {
+    "trial": "T3 trailing-12m brake, band 5%",
+    "sharpe_annual": 0.5084,
+    "sharpe_per_period": 0.03202325662496925
+   },
+   {
+    "trial": "T4 trailing-12m brake, band 10%",
+    "sharpe_annual": 0.5719,
+    "sharpe_per_period": 0.036023426293526555
+   },
+   {
+    "trial": "T5 FINAL: weekly (first trading day), band 10%",
+    "sharpe_annual": 0.5651,
+    "sharpe_per_period": 0.035595254047514416
+   }
+  ],
+  "dev_sharpes_per_period": [
+   0.03545247781753346,
+   0.034872816314737085,
+   0.03202325662496925,
+   0.036023426293526555,
+   0.035595254047514416
+  ]
+ },
+ "crypto_trend": {
+  "trials": [
+   {
+    "trial": "T1 initial: all-time-high drawdown brake, band 2%",
+    "sharpe_annual": 1.1656,
+    "sharpe_per_period": 0.06101087819783543
+   },
+   {
+    "trial": "T2 trailing-12m brake, band 2%",
+    "sharpe_annual": 1.1204,
+    "sharpe_per_period": 0.05864464755889864
+   },
+   {
+    "trial": "T3 trailing-12m brake, band 5%",
+    "sharpe_annual": 1.1696,
+    "sharpe_per_period": 0.061221416743642475
+   },
+   {
+    "trial": "T4 trailing-12m brake, band 10%",
+    "sharpe_annual": 1.2083,
+    "sharpe_per_period": 0.06324520380900041
+   },
+   {
+    "trial": "T5 weekly (last trading day), band 10%",
+    "sharpe_annual": 1.3578,
+    "sharpe_per_period": 0.07106807991527465
+   },
+   {
+    "trial": "T6 FINAL: weekly (first trading day), band 10%",
+    "sharpe_annual": 1.1671,
+    "sharpe_per_period": 0.06109114899646666
+   }
+  ],
+  "dev_sharpes_per_period": [
+   0.06101087819783543,
+   0.05864464755889864,
+   0.061221416743642475,
+   0.06324520380900041,
+   0.07106807991527465,
+   0.06109114899646666
+  ]
+ }
+}
