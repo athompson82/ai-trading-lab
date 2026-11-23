@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-11-23_
+_Last updated: 2026-11-23 (evening)_
 
 ## Where we are
 
@@ -57,11 +57,10 @@ to answer Q4 and the AI A/B question.
 1. ~~Move the code into the dedicated GitHub repository.~~ Done 2026-11-23 (public repo, `main`).
 2. ~~Owner sign-off; tag `prereg-v1`.~~ Done 2026-11-23 (commit 55505a7). The tag exists locally; the session's git proxy refused to push tags, so the commit timestamp is the public record.
 3. ~~One-time holdout evaluation.~~ Done 2026-11-23 → reports/holdout.md, ledger seq 1.
-4. AI overlay implementation (needs an Anthropic API key).
+4. ~~AI overlay + AI trader arms.~~ Built 2026-11-23 (addendum A1). Waiting on a successful `ai-check` run with the owner's `ANTHROPIC_API_KEY` secret.
 5. ~~Repository secret `TIINGO_API_KEY`.~~ Added by owner 2026-11-23; checked with the `data-check` workflow.
    Later: `ANTHROPIC_API_KEY`; set the `FORWARD_START` variable to begin the shakedown.
 
 ## Blocked on owner
 
 - Set repository variable `FORWARD_START=2026-11-24` to start the shakedown.
-- Anthropic API key (for the AI arm). Spend cap about $30/month, as approved.

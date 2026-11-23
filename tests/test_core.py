@@ -107,7 +107,7 @@ def test_live_runner_reproduces_backtest(tmp_path, monkeypatch, sleeve):
     start = "2022-01-03"
     arm = next(a for a in live.arms() if a.name == sleeve)
     lg = Ledger(tmp_path / "events.jsonl")
-    live.run_arm(arm, lg, start, {})
+    live.run_arm(arm, lg, start)
     st = json.loads((tmp_path / "state" / f"{sleeve}.json").read_text())
     live_eq = pd.Series([e for _, e in st["equity"]], index=pd.to_datetime([d for d, _ in st["equity"]]))
 

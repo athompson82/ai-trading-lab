@@ -3,3 +3,4 @@ numpy==2.5.3
 requests==2.34.2
 pytest==9.1.1
 tabulate==0.10.0
+anthropic==2.13.0

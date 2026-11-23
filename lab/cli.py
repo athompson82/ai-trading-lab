@@ -24,6 +24,7 @@ def main(argv=None) -> int:
     r.add_argument("--offline", action="store_true", help="use cached data (testing only)")
     sub.add_parser("verify")
     sub.add_parser("report")
+    sub.add_parser("ai-check", help="one real AI trader call per sleeve into a throwaway ledger")
     a = p.parse_args(argv)
 
     if a.cmd == "fetch":
@@ -49,6 +50,26 @@ def main(argv=None) -> int:
         from .live import LEDGER_DIR
         ok, msg = Ledger(LEDGER_DIR / "events.jsonl").verify()
         print(msg)
+        return 0 if ok else 1
+    if a.cmd == "ai-check":
+        import json
+        import tempfile
+        from pathlib import Path
+        from .config import SLEEVES
+        from .ledger import Ledger
+        from .overlay import ai_trader
+        from .research import load_prices
+        lg = Ledger(Path(tempfile.mkdtemp()) / "check.jsonl")   # never touches the real ledger
+        ok = True
+        for name, cfg in SLEEVES.items():
+            closes = load_prices(cfg)[1][list(cfg.assets)]
+            w, meta = ai_trader(cfg, closes, {}, lg)
+            print(f"== {name}: status={meta['status']}")
+            print(json.dumps({"weights": w, **meta}, indent=1)[:3000])
+            ok = ok and w is not None
+        for e in lg.events():
+            if e["type"] == "ai_call":
+                print("call:", {k: e["data"].get(k) for k in ("purpose", "ok", "model", "cost_usd", "error")})
         return 0 if ok else 1
     if a.cmd == "report":
         from .report import write_report

@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import subprocess
 from dataclasses import dataclass, replace
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
@@ -36,7 +37,7 @@ LEDGER_DIR = ROOT / "ledger"
 class Arm:
     name: str
     sleeve: str
-    kind: str                 # "trend" or "benchmark"
+    kind: str                 # "trend", "benchmark" or "ai_trader"
     use_overlay: bool = False
     bench_spec: tuple = ()
 
@@ -50,6 +51,8 @@ def arms() -> list[Arm]:
     for sleeve in SLEEVES:
         out.append(Arm(sleeve, sleeve, "trend"))
         out.append(Arm(f"{sleeve}_ai", sleeve, "trend", use_overlay=True))
+        # Added by addendum (docs/PREREGISTRATION_ADDENDUM_AI.md); forward-only.
+        out.append(Arm(f"{sleeve.split('_')[0]}_ai_trader", sleeve, "ai_trader"))
         for bname, spec in benchmark_specs(SLEEVES[sleeve]).items():
             out.append(Arm(f"{sleeve.split('_')[0]}_{bname}", sleeve, "benchmark",
                            bench_spec=tuple(spec.items())))
@@ -73,6 +76,10 @@ def load_state(arm: Arm, start: str) -> dict:
     if p.exists():
         return json.loads(p.read_text())
     cfg = arm.cfg()
+    if arm.kind == "ai_trader":
+        # Added mid-experiment: it starts from the day it is first switched on,
+        # not from the forward-test start (it can't make decisions for the past).
+        start = max(start, str(datetime.now(timezone.utc).date() - timedelta(days=1)))
     return {"arm": arm.name, "start": start, "last_date": None, "pending": None,
             "portfolio": Portfolio(cash=cfg.capital, peak_equity=cfg.capital).to_dict(),
             "equity": []}
@@ -102,19 +109,37 @@ def refresh_all() -> list[str]:
     return problems
 
 
-def run_arm(arm: Arm, ledger: Ledger, start: str, today_overlay: dict | None) -> dict:
+def _first_executable_day(cfg: SleeveConfig, decided_at: datetime) -> str:
+    """First trading day whose OPEN is after the moment an AI decision was made.
+
+    Rule-based decisions use only the close, so they fill at the next open. AI
+    decisions also read news up to the moment of the call (about 01:17 UTC),
+    which is after the crypto day's 00:00 UTC open, so they must wait one more
+    day; otherwise the AI would see news published after the price it trades at.
+    """
+    d = decided_at.date()
+    if cfg.periods_per_year == 365:          # crypto: day opens 00:00 UTC
+        return str(d + timedelta(days=1))
+    # US ETFs open 13:30/14:30 UTC: today's open is still ahead at 01:17 UTC.
+    return str(d if decided_at.hour < 13 else d + timedelta(days=1))
+
+
+def run_arm(arm: Arm, ledger: Ledger, start: str, ai_client=None, now: datetime | None = None) -> dict:
     cfg = arm.cfg()
     assets = list(cfg.assets)
     opens, closes = data.panel(assets, "open"), data.panel(assets, "close")
     if arm.kind == "trend":
         target = trend_weights(closes, cfg)
-    else:
+    elif arm.kind == "benchmark":
         target = constant_weights(closes, dict(arm.bench_spec))
+    else:  # ai_trader: no historical signal; decisions come from the AI on the latest day only
+        target = pd.DataFrame(0.0, index=closes.index, columns=closes.columns)
     cash = None
     if cfg.cash_proxy:
         cash = data.load(cfg.cash_proxy)["close"].pct_change(fill_method=None)
     last_close = closes.ffill().fillna(0.0)
     idx = closes.index
+    now = now or datetime.now(timezone.utc)
 
     st = load_state(arm, start)
     pf = Portfolio.from_dict(st["portfolio"])
@@ -125,32 +150,55 @@ def run_arm(arm: Arm, ledger: Ledger, start: str, today_overlay: dict | None) ->
     for i in todo:
         d = idx[i]
         first_day = st["last_date"] is None
-        decide = first_day or is_rebalance_day(idx, i, cfg.rebalance)
-        ov, ov_meta = None, None
-        if decide and arm.use_overlay:
-            if i == latest_i and today_overlay is not None:
-                ov, ov_meta = today_overlay.get(arm.sleeve, (None, None))
+        is_latest = i == latest_i
+        if arm.kind == "ai_trader":
+            decide = is_latest            # a missed day can't be re-assessed with today's news
+        else:
+            decide = first_day or is_rebalance_day(idx, i, cfg.rebalance)
+
+        # Pending orders wait for their first executable day (AI timing rule).
+        pending = st["pending"]
+        not_before = st.get("pending_not_before")
+        executable = pending is not None and (not_before is None or str(d.date()) >= not_before)
+
+        row = target.iloc[i].fillna(0.0).to_dict()
+        ov, ai_meta, uses_ai = None, None, False
+        if decide and arm.kind == "ai_trader":
+            holdings = pf.weights(last_close.iloc[i].to_dict())
+            w, ai_meta = overlay_mod.ai_trader(cfg, closes.iloc[: i + 1], holdings, ledger, client=ai_client)
+            if w is None:
+                decide = False            # AI unavailable: keep current positions, logged below
+                ledger.append("decision_skipped", {"arm": arm.name, "date": str(d.date()), "reason": ai_meta})
             else:
-                # A missed day can't be re-assessed honestly with today's news.
-                ov_meta = {"status": "skipped_catchup_day"}
-        res = step(pf, st["pending"], d, opens.iloc[i].to_dict(),
+                row, uses_ai = w, True
+        elif decide and arm.use_overlay:
+            if is_latest:
+                ov, ai_meta = overlay_mod.risk_overlay(cfg, closes.iloc[: i + 1], row, ledger, client=ai_client)
+                uses_ai = ov is not None
+            else:
+                ai_meta = {"status": "skipped_catchup_day"}
+
+        res = step(pf, pending if executable else None, d, opens.iloc[i].to_dict(),
                    last_close.iloc[i - 1].to_dict() if i else {}, last_close.iloc[i].to_dict(),
-                   closes.iloc[i].to_dict(), target.iloc[i].fillna(0.0).to_dict(),
+                   closes.iloc[i].to_dict(), row,
                    float(cash.get(d, 0.0)) if cash is not None and np.isfinite(cash.get(d, 0.0)) else 0.0,
-                   cfg, eq_hist, decide=decide, use_risk=arm.kind == "trend", overlay=ov)
+                   cfg, eq_hist, decide=decide, use_risk=arm.kind != "benchmark", overlay=ov)
         for f in res.fills:
             ledger.append("fill", {"arm": arm.name, **{k: (str(v) if k == "date" else v)
                                                        for k, v in f.__dict__.items()}})
         if decide:
             ledger.append("decision", {"arm": arm.name, "date": str(d.date()),
-                                       "signal": {k: round(float(v), 6) for k, v in target.iloc[i].fillna(0).items()},
+                                       "signal": {k: round(float(v), 6) for k, v in row.items()},
                                        "target": {k: (None if np.isnan(v) else round(v, 6))
                                                   for k, v in res.decision.items()},
-                                       "risk_notes": res.notes, "overlay": ov, "overlay_meta": ov_meta})
+                                       "risk_notes": res.notes, "overlay": ov, "overlay_meta": ai_meta})
+            st["pending"] = res.decision
+            st["pending_not_before"] = _first_executable_day(cfg, now) if uses_ai else None
+        elif executable:
+            st["pending"], st["pending_not_before"] = None, None
         ledger.append("mark", {"arm": arm.name, "date": str(d.date()), "equity": round(res.equity, 4),
                                "cash": round(pf.cash, 4),
                                "weights": {k: round(v, 6) for k, v in res.weights.items()}})
-        st["pending"] = res.decision
         st["equity"].append([str(d.date()), res.equity])
         st["last_date"] = str(d.date())
         st["portfolio"] = pf.to_dict()
@@ -174,8 +222,10 @@ def run_daily(start: str, use_network: bool = True) -> dict:
     import hashlib
     run["data_sha256"] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()[:16]
                           for p in sorted(data.DATA_DIR.glob("*.csv"))}
-    overlays = overlay_mod.today_overlays() if any(a.use_overlay for a in arms()) else {}
-    ledger.append("run_start", {**run, "overlay_status": {k: v[1] for k, v in overlays.items()}})
-    results = [run_arm(a, ledger, start, overlays) for a in arms()]
+    ledger.append("run_start", run)
+    import os
+    ai_on = bool(os.environ.get("ANTHROPIC_API_KEY"))
+    # AI trader arms only exist once the AI is configured (see the addendum).
+    results = [run_arm(a, ledger, start) for a in arms() if a.kind != "ai_trader" or ai_on]
     ledger.append("run_end", {"arms": results})
     return {"results": results}

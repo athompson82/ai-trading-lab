@@ -24,14 +24,15 @@ INTERIM = date(2027, 2, 12)
 SCORED_END = date(2027, 3, 14)
 
 SLEEVES = {
-    "etf": {"title": "ETF sleeve", "arms": ["etf_trend", "etf_trend_ai", "etf_bench_spy", "etf_bench_60_40"]},
+    "etf": {"title": "ETF sleeve", "arms": ["etf_trend", "etf_trend_ai", "etf_bench_spy", "etf_bench_60_40", "etf_ai_trader"]},
     "crypto": {"title": "Crypto sleeve", "arms": ["crypto_trend", "crypto_trend_ai", "crypto_bench_btc",
-                                                  "crypto_bench_btc_eth_50_50"]},
+                                                  "crypto_bench_btc_eth_50_50", "crypto_ai_trader"]},
 }
 LABELS = {
     "etf_trend": "Trend strategy", "etf_trend_ai": "Trend + AI overlay", "etf_bench_spy": "S&P 500 (SPY)",
     "etf_bench_60_40": "60/40 stocks/bonds", "crypto_trend": "Trend strategy", "crypto_trend_ai": "Trend + AI overlay",
     "crypto_bench_btc": "Bitcoin", "crypto_bench_btc_eth_50_50": "50/50 BTC/ETH",
+    "etf_ai_trader": "AI trader (news + trends)", "crypto_ai_trader": "AI trader (news + trends)",
 }
 
 
@@ -132,7 +133,7 @@ def build() -> str:
 
     # ---- positions
     pos_html = []
-    for arm in ("etf_trend", "etf_trend_ai", "crypto_trend", "crypto_trend_ai"):
+    for arm in ("etf_trend", "etf_trend_ai", "etf_ai_trader", "crypto_trend", "crypto_trend_ai", "crypto_ai_trader"):
         m = d["marks"].get(arm)
         p = d["positions"].get(arm, {})
         held = {k: v for k, v in (m or {}).get("weights", {}).items() if abs(v) > 1e-4}
@@ -214,11 +215,11 @@ TEMPLATE = r"""<!doctype html>
 <meta name="description" content="Live dashboard for a pre-registered paper-trading experiment. Simulated money only.">
 <style>
 :root{color-scheme:light;--bg:#f7f7f5;--surface:#fcfcfb;--border:#e4e3df;--text:#0b0b0b;--text2:#52514e;--muted:#7a7974;
---s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--grid:#ecebe7;--good:#006300;--goodbg:#e3f3e3;--bad:#b02a2a;--badbg:#fbe6e6}
+--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--grid:#ecebe7;--good:#006300;--goodbg:#e3f3e3;--bad:#b02a2a;--badbg:#fbe6e6}
 @media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){color-scheme:dark;--bg:#111110;--surface:#1a1a19;--border:#2e2e2b;
---text:#f0efec;--text2:#c3c2b7;--muted:#8f8e86;--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--grid:#262624;--good:#5fd35f;--goodbg:#173017;--bad:#ff8a8a;--badbg:#3a1a1a}}
+--text:#f0efec;--text2:#c3c2b7;--muted:#8f8e86;--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--grid:#262624;--good:#5fd35f;--goodbg:#173017;--bad:#ff8a8a;--badbg:#3a1a1a}}
 :root[data-theme="dark"]{color-scheme:dark;--bg:#111110;--surface:#1a1a19;--border:#2e2e2b;--text:#f0efec;--text2:#c3c2b7;--muted:#8f8e86;
---s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--grid:#262624;--good:#5fd35f;--goodbg:#173017;--bad:#ff8a8a;--badbg:#3a1a1a}
+--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--grid:#262624;--good:#5fd35f;--goodbg:#173017;--bad:#ff8a8a;--badbg:#3a1a1a}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
 main{max-width:1100px;margin:0 auto;padding:24px 16px 64px}h1{font-size:26px;margin:0 0 4px}h2{font-size:19px;margin:36px 0 12px}
 h3{font-size:15px;margin:0 0 10px}.muted{color:var(--muted)}.small{font-size:13px}p{margin:6px 0}
@@ -280,7 +281,7 @@ details summary{cursor:pointer;color:var(--text2)}footer{margin-top:40px;font-si
 </main>
 <script>
 const DATA={{DATA}};
-const COLORS=["--s1","--s2","--s3","--s4"], DASH=["", "6 4", "", ""];
+const COLORS=["--s1","--s2","--s3","--s4","--s5"], DASH=["", "6 4", "", "", ""];
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const fmt=v=>"$"+v.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 function draw(){
