@@ -69,7 +69,8 @@ def main(argv=None) -> int:
             ok = ok and w is not None
         for e in lg.events():
             if e["type"] == "ai_call":
-                print("call:", {k: e["data"].get(k) for k in ("purpose", "ok", "model", "cost_usd", "error")})
+                print("call:", {k: e["data"].get(k) for k in ("purpose", "ok", "model", "cost_usd", "error",
+                                                               "web_search_requests", "searches", "usage")})
         return 0 if ok else 1
     if a.cmd == "report":
         from .report import write_report

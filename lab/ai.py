@@ -49,6 +49,14 @@ def _estimate_cost(usage) -> float:
     return (usage.input_tokens * PRICE_IN + usage.output_tokens * PRICE_OUT) / 1e6 + searches * PRICE_SEARCH
 
 
+def _all_blocks(messages, response):
+    """Content blocks from every paused turn plus the final response."""
+    for m in messages:
+        if m["role"] == "assistant":
+            yield from m["content"]
+    yield from response.content
+
+
 def decide(system: str, prompt: str, schema: dict, ledger, purpose: str, client=None) -> AIResult:
     """Ask Claude for a structured decision, using web search for current news.
 
@@ -102,10 +110,20 @@ def decide(system: str, prompt: str, schema: dict, ledger, purpose: str, client=
     except (TypeError, json.JSONDecodeError) as exc:
         ledger.append("ai_call", {**meta, "ok": False, "error": "invalid_json"})
         raise AIUnavailable("invalid_json") from exc
-    sources = []
-    for b in response.content:
-        if b.type == "web_search_tool_result" and isinstance(b.content, list):
-            sources += [{"title": r.title, "url": r.url} for r in b.content[:5]]
+    sources, search_log = [], []
+    for b in _all_blocks(messages, response):
+        if b.type == "server_tool_use":
+            q = (getattr(b, "input", None) or {})
+            search_log.append({"tool": getattr(b, "name", "?"), "query": str(q.get("query", q))[:200]})
+        elif b.type == "web_search_tool_result":
+            if isinstance(b.content, list):
+                sources += [{"title": r.title, "url": r.url} for r in b.content[:5]]
+                search_log.append({"results": len(b.content)})
+            else:  # an error object, e.g. max_uses_exceeded
+                search_log.append({"error": getattr(b.content, "error_code", str(b.content))})
     meta["sources"] = sources[:15]
+    meta["searches"] = search_log[:30]
+    stu = getattr(response.usage, "server_tool_use", None)
+    meta["web_search_requests"] = getattr(stu, "web_search_requests", None) if stu is not None else None
     ledger.append("ai_call", {**meta, "ok": True, "output": output})
     return AIResult(output, meta)
