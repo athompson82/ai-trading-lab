@@ -70,6 +70,10 @@ to answer Q4 and the AI A/B question.
 - Questions: private page "Ask the Trading Lab" (https://claude.ai/artifact/FndLCFizNc6Y7xAzXkJ4Z2), with its snapshot refreshed weekly.
 - Day 60 (2027-02-12): interim report, plus selection of version-2 candidates with the owner.
 
+## Upcoming project
+
+- Signal Lab, phase 1 (insider buying): starts mid-December 2026. See docs/SIGNAL_LAB_PLAN.md.
+
 ## Blocked on owner
 
 - Set repository variable `FORWARD_START=2026-11-24` to start the shakedown.
