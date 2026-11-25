@@ -1,4 +1,4 @@
 # Forward paper-trading report
-_Generated 2026-11-25 02:09 UTC from the ledger._
+_Generated 2026-11-25 09:55 UTC from the ledger._
 
 No forward data yet.
