@@ -1,12 +1,20 @@
 {
  "arm": "etf_bench_spy",
  "start": "2026-11-24",
- "last_date": null,
- "pending": null,
- "portfolio": {
-  "cash": 5000.0,
-  "units": {},
-  "peak_equity": 5000.0
+ "last_date": "2026-11-24",
+ "pending": {
+  "SPY": 1.0
  },
- "equity": []
+ "portfolio": {
+  "cash": 5000.545851528384,
+  "units": {},
+  "peak_equity": 5000.545851528384
+ },
+ "equity": [
+  [
+   "2026-11-24",
+   5000.545851528384
+  ]
+ ],
+ "pending_not_before": null
 }
