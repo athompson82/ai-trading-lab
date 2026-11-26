@@ -1,5 +1,5 @@
 # Forward paper-trading report
-_Generated 2026-11-26 02:08 UTC from the ledger._
+_Generated 2026-11-26 09:39 UTC from the ledger._
 
 | arm | days | equity (USD) | return | vol (ann.) | Sharpe (ann.) | max drawdown |
 |---|---|---|---|---|---|---|
