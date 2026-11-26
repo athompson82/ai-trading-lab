@@ -1,20 +1,27 @@
 {
  "arm": "crypto_bench_btc_eth_50_50",
  "start": "2026-11-24",
- "last_date": "2026-11-24",
+ "last_date": "2026-11-25",
  "pending": {
   "BTC-USD": 0.5,
   "ETH-USD": 0.5
  },
  "portfolio": {
-  "cash": 5000.0,
-  "units": {},
-  "peak_equity": 5000.0
+  "cash": 0.0,
+  "units": {
+   "BTC-USD": 0.04178435782252702,
+   "ETH-USD": 1.4702076772310548
+  },
+  "peak_equity": 5008.295841857969
  },
  "equity": [
   [
    "2026-11-24",
    5000.0
+  ],
+  [
+   "2026-11-25",
+   5008.295841857969
   ]
  ],
  "pending_not_before": null

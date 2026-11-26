@@ -1,7 +1,7 @@
 {
  "arm": "crypto_ai_trader",
  "start": "2026-11-24",
- "last_date": "2026-11-24",
+ "last_date": "2026-11-25",
  "pending": {
   "BTC-USD": 0.0,
   "ETH-USD": 0.0
@@ -15,7 +15,11 @@
   [
    "2026-11-24",
    5000.0
+  ],
+  [
+   "2026-11-25",
+   5000.0
   ]
  ],
- "pending_not_before": "2026-11-26"
+ "pending_not_before": "2026-11-27"
 }

@@ -1,19 +1,25 @@
 {
  "arm": "crypto_bench_btc",
  "start": "2026-11-24",
- "last_date": "2026-11-24",
+ "last_date": "2026-11-25",
  "pending": {
   "BTC-USD": 1.0
  },
  "portfolio": {
-  "cash": 5000.0,
-  "units": {},
-  "peak_equity": 5000.0
+  "cash": 0.0,
+  "units": {
+   "BTC-USD": 0.08307029388176346
+  },
+  "peak_equity": 5016.075921312403
  },
  "equity": [
   [
    "2026-11-24",
    5000.0
+  ],
+  [
+   "2026-11-25",
+   5016.075921312403
   ]
  ],
  "pending_not_before": null
