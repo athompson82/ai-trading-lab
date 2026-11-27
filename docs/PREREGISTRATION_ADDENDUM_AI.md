@@ -19,7 +19,7 @@ better trading decisions than simple rules and passive investing, after costs?
 ## 3. Rules
 
 - **Decision.** Once a day, after the close, Claude (`claude-opus-5-5`, medium
-  effort, web search capped at 10 calls with 4–6 distinct searches requested) receives:
+  effort, basic web search capped at 8 calls with 4–6 distinct searches requested; changed during the shakedown, D-036) receives:
   - the price-trend facts (1-week, 1-month, 3-month and 12-month returns, and volatility),
   - its current weights, and
   - the rules: long or cash only, per-asset caps (30% ETF / 70% crypto), total ≤ 100%, and the cost per trade.

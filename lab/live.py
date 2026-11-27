@@ -71,7 +71,7 @@ def _state_path(arm: str) -> Path:
     return LEDGER_DIR / "state" / f"{arm}.json"
 
 
-def load_state(arm: Arm, start: str) -> dict:
+def load_state(arm: Arm, start: str, now: datetime | None = None) -> dict:
     p = _state_path(arm.name)
     if p.exists():
         return json.loads(p.read_text())
@@ -79,7 +79,7 @@ def load_state(arm: Arm, start: str) -> dict:
     if arm.kind == "ai_trader":
         # Added mid-experiment: it starts from the day it is first switched on,
         # not from the forward-test start (it can't make decisions for the past).
-        start = max(start, str(datetime.now(timezone.utc).date() - timedelta(days=1)))
+        start = max(start, str((now or datetime.now(timezone.utc)).date() - timedelta(days=1)))
     return {"arm": arm.name, "start": start, "last_date": None, "pending": None,
             "portfolio": Portfolio(cash=cfg.capital, peak_equity=cfg.capital).to_dict(),
             "equity": []}
@@ -143,7 +143,7 @@ def run_arm(arm: Arm, ledger: Ledger, start: str, ai_client=None, now: datetime 
     idx = closes.index
     now = now or datetime.now(timezone.utc)
 
-    st = load_state(arm, start)
+    st = load_state(arm, start, now)
     pf = Portfolio.from_dict(st["portfolio"])
     eq_hist = [e for _, e in st["equity"]]
     last = pd.Timestamp(st["last_date"]) if st["last_date"] else None
@@ -166,7 +166,14 @@ def run_arm(arm: Arm, ledger: Ledger, start: str, ai_client=None, now: datetime 
         row = target.iloc[i].fillna(0.0).to_dict()
         ov, ai_meta, uses_ai = None, None, False
         if decide and arm.kind == "ai_trader":
-            holdings = pf.weights(last_close.iloc[i].to_dict())
+            # Holdings after today's open fills (D-035); the AI decides at today's close.
+            import copy
+            from .engine import execute as _execute
+            pf_after = copy.deepcopy(pf)
+            if executable:
+                _execute(pf_after, pending, opens.iloc[i].to_dict(), d, cfg,
+                         ref_prices=last_close.iloc[i - 1].to_dict() if i else {})
+            holdings = pf_after.weights(last_close.iloc[i].to_dict())
             w, ai_meta = overlay_mod.ai_trader(cfg, closes.iloc[: i + 1], holdings, ledger, client=ai_client)
             if w is None:
                 decide = False            # AI unavailable: keep current positions, logged below

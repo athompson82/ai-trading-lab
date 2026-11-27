@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 
 MODEL = "claude-opus-5-5"
 EFFORT = "medium"
-MAX_SEARCHES = 10  # tool cap; prompts ask for 4-6 distinct searches (D-021)
+MAX_SEARCHES = 8  # tool cap; prompts ask for 4-6 distinct searches (D-021, D-036)
 # US$ per million tokens / per search for MODEL (platform pricing, 2026-11).
 PRICE_IN, PRICE_OUT, PRICE_SEARCH = 4.00, 20.00, 0.01
 # Owner-approved AI cap is $60/month (D-017). Stop at $50 to leave headroom.
@@ -87,7 +87,7 @@ def decide(system: str, prompt: str, schema: dict, ledger, purpose: str, client=
                 fallbacks="default",
             )
             if web_search:
-                kwargs["tools"] = [{"type": "web_search_20260209", "name": "web_search", "max_uses": MAX_SEARCHES}]
+                kwargs["tools"] = [{"type": "web_search_20250305", "name": "web_search", "max_uses": MAX_SEARCHES}]
             response = client.beta.messages.create(**kwargs)
             c = _estimate_cost(response.usage)
             cost += c

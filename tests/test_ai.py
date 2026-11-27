@@ -126,3 +126,34 @@ def test_weekly_report_builds_and_logs_candidates(tmp_path, monkeypatch):
     assert "## In plain English" in text
     assert "| proposed |" in (tmp_path / "IMPROVEMENTS.md").read_text()
     assert Ledger(tmp_path / "events.jsonl").verify()[0]
+
+
+def test_ai_trader_sees_post_fill_holdings(tmp_path, monkeypatch):
+    """D-035: on day 2 the AI must be told what it bought at that day's open, not 'all cash'."""
+    monkeypatch.setattr(live, "LEDGER_DIR", tmp_path)
+    arm = next(a for a in live.arms() if a.name == "etf_ai_trader")
+    lg = Ledger(tmp_path / "events.jsonl")
+    prompts = []
+
+    class Capturing(FakeClient):
+        def _create(self, **kw):
+            prompts.append(kw["messages"][0]["content"])
+            return super()._create(**kw)
+
+    fake = Capturing({"weights": {"SPY": 0.3, "IEF": 0.3}, "rationale": "r", "key_news": [], "confidence": "low"})
+    closes = research.load_prices(ETF_SLEEVE)[1]
+    d1, d2 = closes.index[-3], closes.index[-2]
+    # Day 1: decide (decision executes at day 2's open). Day 2: AI decides again.
+    live.run_arm(arm, lg, str(d1.date()), ai_client=fake,
+                 now=datetime.combine((d1 + pd.Timedelta(days=1)).date(), datetime.min.time(), timezone.utc).replace(hour=1))
+    st = json.loads((tmp_path / "state" / "etf_ai_trader.json").read_text())
+    st["equity"] = st["equity"][:1]; st["last_date"] = str(d1.date())
+    (tmp_path / "state" / "etf_ai_trader.json").write_text(json.dumps(st))
+    import lab.data as data_mod
+    real_panel = data_mod.panel
+    monkeypatch.setattr(data_mod, "panel", lambda syms, field="close": real_panel(syms, field).loc[:d2])
+    live.run_arm(arm, lg, str(d1.date()), ai_client=fake,
+                 now=datetime.combine((d2 + pd.Timedelta(days=1)).date(), datetime.min.time(), timezone.utc).replace(hour=1))
+    assert len(prompts) == 2
+    spy_line = next(l for l in prompts[1].splitlines() if l.startswith("SPY |"))
+    assert not spy_line.rstrip().endswith("| 0%"), spy_line   # holds ~30% SPY after day-2 open fills
